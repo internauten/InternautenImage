@@ -1,0 +1,24 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python leftovers (from previous tooling)
+__pycache__/
+*.pyc
+
+# Logs / temp
+*.log
+*.tmp
+*.temp
+
+# Packaged release artifacts
+*.zip
+!*.keep
+
+# Optional dependency directories
+vendor/
+node_modules/
