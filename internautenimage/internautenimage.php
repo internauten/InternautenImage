@@ -9,7 +9,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '0.0.2';
+        $this->version = '0.0.3';
         $this->author = 'Internauten';
         $this->need_instance = 0;
         $this->bootstrap = true;
