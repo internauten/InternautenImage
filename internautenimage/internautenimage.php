@@ -9,7 +9,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '0.0.4';
+        $this->version = '0.0.5';
         $this->author = 'Internauten';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -618,7 +618,12 @@ class InternautenImage extends Module
         $query->orderBy('p.id_product ASC');
         $query->limit(1);
 
-        $id = (int) $db->getValue($query);
+        $rows = $db->executeS($query);
+        if ($rows === false || empty($rows) || !isset($rows[0]['id_product'])) {
+            return 0;
+        }
+
+        $id = (int) $rows[0]['id_product'];
         return $id > 0 ? $id : 0;
     }
 
