@@ -9,7 +9,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '0.0.3';
+        $this->version = '0.0.4';
         $this->author = 'Internauten';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -597,27 +597,28 @@ class InternautenImage extends Module
         $productFilter = $productFilter === 'active' ? 'active' : 'all';
         $onlyActive = $productFilter === 'active';
 
+        $query = new DbQuery();
+        $query->select('p.id_product');
+        $query->from('product', 'p');
+        $query->where("p.reference = '" . $reference . "'");
+
         if (Shop::isFeatureActive()) {
+            $query->innerJoin('product_shop', 'ps', 'ps.id_product = p.id_product');
+
             if ($shopScope === 'current') {
                 $shopId = (int) $this->context->shop->id;
-                $sql = 'SELECT p.id_product FROM ' . _DB_PREFIX_ . 'product p '
-                    . 'INNER JOIN ' . _DB_PREFIX_ . 'product_shop ps ON (ps.id_product = p.id_product) '
-                    . 'WHERE p.reference = \'' . $reference . '\' AND ps.id_shop = ' . $shopId
-                    . ($onlyActive ? ' AND ps.active = 1' : '')
-                    . ' LIMIT 1';
-            } else {
-                $sql = 'SELECT p.id_product FROM ' . _DB_PREFIX_ . 'product p '
-                    . 'INNER JOIN ' . _DB_PREFIX_ . 'product_shop ps ON (ps.id_product = p.id_product) '
-                    . 'WHERE p.reference = \'' . $reference . '\''
-                    . ($onlyActive ? ' AND ps.active = 1' : '')
-                    . ' ORDER BY p.id_product ASC LIMIT 1';
+                $query->where('ps.id_shop = ' . $shopId);
             }
-        } else {
-            $sql = 'SELECT p.id_product FROM ' . _DB_PREFIX_ . 'product p '
-                . 'WHERE p.reference = \'' . $reference . '\' ORDER BY p.id_product ASC LIMIT 1';
+
+            if ($onlyActive) {
+                $query->where('ps.active = 1');
+            }
         }
 
-        $id = (int) $db->getValue($sql);
+        $query->orderBy('p.id_product ASC');
+        $query->limit(1);
+
+        $id = (int) $db->getValue($query);
         return $id > 0 ? $id : 0;
     }
 
