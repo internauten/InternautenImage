@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Validate tag format
         run: |
@@ -44,9 +46,31 @@ jobs:
           print(out)
           PY
 
+      - name: Generate changelog since previous tag
+        run: |
+          current_tag="${GITHUB_REF_NAME}"
+          previous_tag="$(git tag --sort=-version:refname \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | grep -Fxv "${current_tag}" \
+            | head -n 1 || true)"
+
+          {
+            echo "## Changelog"
+            echo
+            if [[ -n "${previous_tag}" ]]; then
+              echo "Changes since ${previous_tag}:"
+              echo
+              git log "${previous_tag}..${current_tag}" --no-merges --pretty=format:'- %s (%h)'
+            else
+              echo "Initial release changes:"
+              echo
+              git log "${current_tag}" --no-merges --pretty=format:'- %s (%h)'
+            fi
+          } > RELEASE_CHANGELOG.md
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          body_path: RELEASE_CHANGELOG.md
           files: |
             internautenimage-module-${{ github.ref_name }}.zip

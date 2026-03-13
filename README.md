@@ -1,5 +1,11 @@
 # InternautenImage PrestaShop Module
 
+[![Release Workflow](https://github.com/internauten/InternautenImage/actions/workflows/release.yml/badge.svg)](https://github.com/internauten/InternautenImage/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/internauten/InternautenImage?sort=semver)](https://github.com/internauten/InternautenImage/releases)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-pink)](https://github.com/sponsors/internauten)
+[![GitHub stars](https://img.shields.io/github/stars/internauten/InternautenImage?style=social)](https://github.com/internauten/InternautenImage/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+
 This project contains an installable PrestaShop module that exports product images as a ZIP directly from the standard module configuration page.
 
 ## Module Directory
@@ -80,3 +86,15 @@ git push origin v1.1.2
 The workflow then builds and uploads:
 
 - internautenimage-module-v1.1.2.zip
+
+### via script
+```bash
+cd scripts
+./push-tag-from-module-version.sh
+```
+
+## License
+
+This project is licensed under the MIT License. See details [`LICENSE`](LICENSE).
+
+Copyright (c) 2026 die.internauten.ch GmbH
