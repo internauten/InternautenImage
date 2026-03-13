@@ -8,7 +8,7 @@ This project contains an installable PrestaShop module that exports product imag
 
 ## Installable ZIP
 
-- `internautenimage-module-1.1.1.zip`
+- find it under releses
 
 ## Installation in PrestaShop
 
