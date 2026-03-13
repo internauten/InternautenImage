@@ -63,3 +63,20 @@ If a reference contains special characters, they are sanitized for file names.
 - Creates the ZIP in the cache directory.
 - Sends the ZIP directly as a download from the configuration page.
 - Cleans up temporary files after export.
+
+## Release Tagging
+
+GitHub Releases are created automatically when you push a tag in this format:
+
+- vX.X.X (example: v1.1.2)
+
+Create and push a release tag:
+
+```bash
+git tag v1.1.2
+git push origin v1.1.2
+```
+
+The workflow then builds and uploads:
+
+- internautenimage-module-v1.1.2.zip
