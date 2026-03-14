@@ -37,3 +37,14 @@ $_MODULE['<{internautenimage}prestashop>internautenimage_017abe857d8766fd6eb36e8
 $_MODULE['<{internautenimage}prestashop>internautenimage_8ab3b04c7f8d2bb4eec8657d0e4ca4a6'] = 'ZIP-Datei konnte nicht geoeffnet werden.';
 $_MODULE['<{internautenimage}prestashop>internautenimage_9d5e0b78011686d8154495a59a1f9d4a'] = 'ZIP-Datei konnte nicht entpackt werden.';
 $_MODULE['<{internautenimage}prestashop>internautenimage_68683c2da0ebca5ff02e852cd4d0a230'] = 'Keine Bilddateien in der ZIP gefunden.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_import_progress'] = 'Importfortschritt';
+$_MODULE['<{internautenimage}prestashop>internautenimage_uploading'] = 'Wird hochgeladen...';
+$_MODULE['<{internautenimage}prestashop>internautenimage_processing'] = 'Wird verarbeitet...';
+$_MODULE['<{internautenimage}prestashop>internautenimage_importing'] = 'Importiere';
+$_MODULE['<{internautenimage}prestashop>internautenimage_import_completed'] = 'Import abgeschlossen.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_images_imported'] = 'Bilder importiert,';
+$_MODULE['<{internautenimage}prestashop>internautenimage_files_skipped'] = 'Dateien ubersprungen.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_import_failed'] = 'Import fehlgeschlagen:';
+$_MODULE['<{internautenimage}prestashop>internautenimage_unknown_error'] = 'Ein unbekannter Fehler ist aufgetreten.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_server_error'] = 'Serverfehler beim Import.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_network_error'] = 'Netzwerkfehler beim Import.';

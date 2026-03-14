@@ -9,7 +9,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '0.0.6';
+        $this->version = '0.0.5';
         $this->author = 'Internauten';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -33,6 +33,53 @@ class InternautenImage extends Module
 
     public function getContent()
     {
+        if ((string) Tools::getValue('internautenimage_ajax') === '1') {
+            $action = (string) Tools::getValue('internautenimage_action');
+            $progressKey = preg_replace('/[^a-z0-9]/', '', (string) Tools::getValue('progress_key'));
+
+            if ($action === 'get_progress') {
+                if (session_status() === PHP_SESSION_ACTIVE) {
+                    session_write_close();
+                }
+                $data = '{"current":0,"total":0}';
+                if ($progressKey !== '') {
+                    $progressFile = _PS_CACHE_DIR_ . 'internautenimage_progress_' . $progressKey . '.json';
+                    if (is_file($progressFile)) {
+                        $raw = (string) file_get_contents($progressFile);
+                        if ($raw !== '') {
+                            $data = $raw;
+                        }
+                    }
+                }
+                header('Content-Type: application/json');
+                echo $data;
+                exit;
+            }
+
+            if ($action === 'import') {
+                if (session_status() === PHP_SESSION_ACTIVE) {
+                    session_write_close();
+                }
+                try {
+                    $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_SHOP_SCOPE', 'current');
+                    $productFilter = (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all');
+                    $result = $this->importArchive($shopScope, $productFilter, $progressKey);
+                    if ($progressKey !== '') {
+                        @unlink(_PS_CACHE_DIR_ . 'internautenimage_progress_' . $progressKey . '.json');
+                    }
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => true, 'imported' => (int) $result['imported'], 'skipped' => (int) $result['skipped']]);
+                } catch (Exception $e) {
+                    if ($progressKey !== '') {
+                        @unlink(_PS_CACHE_DIR_ . 'internautenimage_progress_' . $progressKey . '.json');
+                    }
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                }
+                exit;
+            }
+        }
+
         $html = '';
 
         if (Tools::isSubmit('submitInternautenImageImport')) {
@@ -260,7 +307,151 @@ class InternautenImage extends Module
             'INTERN_AUTENIMAGE_PRODUCT_FILTER' => (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all'),
         ];
 
-        return $helper->generateForm([$fieldsForm]);
+        $formHtml = $helper->generateForm([$fieldsForm]);
+        $ajaxUrl = json_encode(
+            AdminController::$currentIndex . '&configure=' . $this->name . '&token=' . Tools::getAdminTokenLite('AdminModules')
+        );
+
+        $lProgress    = $this->l('Import progress');
+        $lUploading   = json_encode($this->l('Uploading...'));
+        $lProcessing  = json_encode($this->l('Processing...'));
+        $lImporting   = json_encode($this->l('Importing'));
+        $lDone        = json_encode($this->l('Import completed.'));
+        $lImported    = json_encode($this->l('images imported,'));
+        $lSkipped     = json_encode($this->l('files skipped.'));
+        $lFailed      = json_encode($this->l('Import failed:'));
+        $lUnknown     = json_encode($this->l('An unknown error occurred.'));
+        $lServerErr   = json_encode($this->l('Server error during import.'));
+        $lNetworkErr  = json_encode($this->l('Network error during import.'));
+
+        $progressHtml = '
+<div id="internautenimage-progress-wrap" style="display:none;margin-top:15px;" class="panel">
+    <div class="panel-heading"><i class="icon-spinner icon-spin"></i> ' . $lProgress . '</div>
+    <div class="panel-body">
+        <div class="progress">
+            <div id="internautenimage-progress-bar"
+                 class="progress-bar progress-bar-striped active"
+                 role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"
+                 style="width:2%;min-width:2em;transition:width 0.4s ease;">0%</div>
+        </div>
+        <p id="internautenimage-progress-text" style="margin-top:8px;"></p>
+        <div id="internautenimage-result" style="display:none;margin-top:10px;"></div>
+    </div>
+</div>
+<script>
+(function () {
+    var ajaxUrl = ' . $ajaxUrl . ';
+    var btn = document.querySelector(\'button[name="submitInternautenImageImport"]\');
+    if (!btn) { return; }
+    var form = btn.closest(\'form\');
+    if (!form) { return; }
+    var wrap = document.getElementById(\'internautenimage-progress-wrap\');
+    var bar  = document.getElementById(\'internautenimage-progress-bar\');
+    var txt  = document.getElementById(\'internautenimage-progress-text\');
+    var res  = document.getElementById(\'internautenimage-result\');
+
+    form.addEventListener(\'submit\', function (e) {
+        e.preventDefault();
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+
+        var key = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        var fd  = new FormData(form);
+        fd.append(\'internautenimage_ajax\', \'1\');
+        fd.append(\'internautenimage_action\', \'import\');
+        fd.append(\'progress_key\', key);
+
+        wrap.style.display = \'block\';
+        res.style.display  = \'none\';
+        res.textContent    = \'\';
+        bar.className      = \'progress-bar progress-bar-striped active\';
+        bar.style.width    = \'2%\';
+        bar.textContent    = \'0%\';
+        txt.style.display  = \'block\';
+        txt.textContent    = ' . $lUploading . ';
+        btn.disabled = true;
+
+        var poll = setInterval(function () {
+            var x = new XMLHttpRequest();
+            x.open(\'GET\', ajaxUrl + \'&internautenimage_ajax=1&internautenimage_action=get_progress&progress_key=\' + encodeURIComponent(key), true);
+            x.onload = function () {
+                try {
+                    var d = JSON.parse(x.responseText);
+                    if (d.total > 0) {
+                        var p = Math.min(99, Math.round(d.current / d.total * 100));
+                        bar.style.width = p + \'%\';
+                        bar.setAttribute(\'aria-valuenow\', p);
+                        bar.textContent = p + \'%\';
+                        txt.textContent = ' . $lImporting . ' + \' \' + d.current + \' / \' + d.total;
+                    }
+                } catch (ex) {}
+            };
+            x.send();
+        }, 700);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open(\'POST\', ajaxUrl, true);
+
+        xhr.upload.onprogress = function (e) {
+            if (!e.lengthComputable || e.total === 0) { return; }
+            var p = Math.max(2, Math.round(e.loaded / e.total * 10));
+            if (e.loaded < e.total) {
+                bar.style.width = p + \'%\';
+                bar.textContent = p + \'%\';
+            } else {
+                txt.textContent = ' . $lProcessing . ';
+            }
+        };
+
+        xhr.onload = function () {
+            clearInterval(poll);
+            bar.style.width = \'100%\';
+            bar.setAttribute(\'aria-valuenow\', 100);
+            bar.textContent = \'100%\';
+            bar.classList.remove(\'active\');
+            var ok = false;
+            if (xhr.status === 200) {
+                try {
+                    var r = JSON.parse(xhr.responseText);
+                    if (r.success) {
+                        ok = true;
+                        bar.classList.add(\'progress-bar-success\');
+                        res.className   = \'alert alert-success\';
+                        res.textContent = ' . $lDone . ' + \' \' + r.imported + \' \' + ' . $lImported . ' + \' \' + r.skipped + \' \' + ' . $lSkipped . ';
+                    } else {
+                        res.className   = \'alert alert-danger\';
+                        res.textContent = ' . $lFailed . ' + \' \' + r.error;
+                    }
+                } catch (ex) {
+                    res.className   = \'alert alert-danger\';
+                    res.textContent = ' . $lUnknown . ';
+                }
+            } else {
+                res.className   = \'alert alert-danger\';
+                res.textContent = ' . $lServerErr . ';
+            }
+            if (!ok) { bar.classList.add(\'progress-bar-danger\'); }
+            txt.style.display = \'none\';
+            res.style.display = \'block\';
+            btn.disabled = false;
+        };
+
+        xhr.onerror = function () {
+            clearInterval(poll);
+            bar.classList.remove(\'active\');
+            bar.classList.add(\'progress-bar-danger\');
+            res.className   = \'alert alert-danger\';
+            res.textContent = ' . $lNetworkErr . ';
+            txt.style.display = \'none\';
+            res.style.display = \'block\';
+            btn.disabled = false;
+        };
+
+        xhr.send(fd);
+    });
+}());
+</script>';
+
+        return $formHtml . $progressHtml;
     }
 
     protected function buildArchive($langId, $shopScope, $productFilter)
@@ -400,7 +591,7 @@ class InternautenImage extends Module
         return $ids;
     }
 
-    protected function importArchive($shopScope, $productFilter)
+    protected function importArchive($shopScope, $productFilter, $progressKey = '')
     {
         if (!isset($_FILES['INTERN_AUTENIMAGE_IMPORT_ZIP'])) {
             throw new Exception($this->l('No ZIP file provided.'));
@@ -452,6 +643,10 @@ class InternautenImage extends Module
             throw new Exception($this->l('No image files found in the ZIP.'));
         }
 
+        $totalFiles = count($files);
+        $processedFiles = 0;
+        $this->updateProgress($progressKey, 0, $totalFiles);
+
         $grouped = [];
         foreach ($files as $filePath) {
             $filename = basename($filePath);
@@ -479,6 +674,8 @@ class InternautenImage extends Module
             $productId = $this->findProductIdByReference($reference, $shopScope, $productFilter);
             if ($productId <= 0) {
                 $skipped += count($items);
+                $processedFiles += count($items);
+                $this->updateProgress($progressKey, $processedFiles, $totalFiles);
                 continue;
             }
 
@@ -494,6 +691,8 @@ class InternautenImage extends Module
             $product = new Product((int) $productId, false, null, $shopIdForProduct);
             if (!Validate::isLoadedObject($product)) {
                 $skipped += count($items);
+                $processedFiles += count($items);
+                $this->updateProgress($progressKey, $processedFiles, $totalFiles);
                 continue;
             }
 
@@ -504,6 +703,8 @@ class InternautenImage extends Module
                 } else {
                     $skipped++;
                 }
+                $processedFiles++;
+                $this->updateProgress($progressKey, $processedFiles, $totalFiles);
             }
         }
 
@@ -511,8 +712,9 @@ class InternautenImage extends Module
         foreach ($grouped as $groupItems) {
             $knownCount += count($groupItems);
         }
-        $skipped += max(0, count($files) - $knownCount);
+        $skipped += max(0, $totalFiles - $knownCount);
 
+        $this->updateProgress($progressKey, $totalFiles, $totalFiles);
         $this->removeDirectory($extractDir);
 
         return [
@@ -749,6 +951,15 @@ class InternautenImage extends Module
         } while (file_exists($candidate));
 
         return $candidate;
+    }
+
+    protected function updateProgress($progressKey, $current, $total)
+    {
+        if ($progressKey === '') {
+            return;
+        }
+        $progressFile = _PS_CACHE_DIR_ . 'internautenimage_progress_' . $progressKey . '.json';
+        file_put_contents($progressFile, json_encode(['current' => (int) $current, 'total' => (int) $total]));
     }
 
     protected function removeDirectory($dir)
