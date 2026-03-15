@@ -93,6 +93,21 @@ cd scripts
 ./push-tag-from-module-version.sh
 ```
 
+
+## Test nach Neustart
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+```
+
+```bash
+curl -I http://localhost:8080/de/
+```
+
+```bash
+docker exec prestashop php -r 'echo "upload_max_filesize=".ini_get("upload_max_filesize").PHP_EOL; echo "post_max_size=".ini_get("post_max_size").PHP_EOL;'
+```
+
 ## License
 
 This project is licensed under the MIT License. See details [`LICENSE`](LICENSE).

@@ -314,6 +314,7 @@ class InternautenImage extends Module
 
         $lProgress    = $this->l('Import progress');
         $lUploading   = json_encode($this->l('Uploading...'));
+        $lUploadingPct = json_encode($this->l('Uploading') . ' ');
         $lProcessing  = json_encode($this->l('Processing...'));
         $lImporting   = json_encode($this->l('Importing'));
         $lDone        = json_encode($this->l('Import completed.'));
@@ -323,6 +324,26 @@ class InternautenImage extends Module
         $lUnknown     = json_encode($this->l('An unknown error occurred.'));
         $lServerErr   = json_encode($this->l('Server error during import.'));
         $lNetworkErr  = json_encode($this->l('Network error during import.'));
+        $lTimeoutErr  = json_encode($this->l('Upload timed out. Please try a smaller ZIP or increase server limits.'));
+        $lDebugPrefix = json_encode($this->l('Debug')); 
+        $lTooLargeClient = json_encode(
+            sprintf(
+                $this->l('ZIP is too large for server limits (upload_max_filesize=%s, post_max_size=%s).'),
+                (string) ini_get('upload_max_filesize'),
+                (string) ini_get('post_max_size')
+            )
+        );
+        $uploadMaxBytes = (int) $this->iniSizeToBytes((string) ini_get('upload_max_filesize'));
+        $postMaxBytes = (int) $this->iniSizeToBytes((string) ini_get('post_max_size'));
+        $clientMaxBytes = 0;
+        if ($uploadMaxBytes > 0 && $postMaxBytes > 0) {
+            $clientMaxBytes = min($uploadMaxBytes, $postMaxBytes);
+        } elseif ($uploadMaxBytes > 0) {
+            $clientMaxBytes = $uploadMaxBytes;
+        } elseif ($postMaxBytes > 0) {
+            $clientMaxBytes = $postMaxBytes;
+        }
+        $clientMaxBytesJs = (int) $clientMaxBytes;
 
         $progressHtml = '
 <div id="internautenimage-progress-wrap" style="display:none;margin-top:15px;" class="panel">
@@ -336,6 +357,7 @@ class InternautenImage extends Module
         </div>
         <p id="internautenimage-progress-text" style="margin-top:8px;"></p>
         <div id="internautenimage-result" style="display:none;margin-top:10px;"></div>
+        <pre id="internautenimage-debug" style="display:none;margin-top:10px;max-height:180px;overflow:auto;white-space:pre-wrap;background:#f7f7f9;border:1px solid #ddd;padding:8px;"></pre>
     </div>
 </div>
 <script>
@@ -349,20 +371,51 @@ class InternautenImage extends Module
     var bar  = document.getElementById(\'internautenimage-progress-bar\');
     var txt  = document.getElementById(\'internautenimage-progress-text\');
     var res  = document.getElementById(\'internautenimage-result\');
+    var dbg  = document.getElementById(\'internautenimage-debug\');
+    var uploadPhaseDone = false;
+    var clientMaxBytes = ' . $clientMaxBytesJs . ';
+
+    var setDebug = function (label, xhr) {
+        if (!dbg) { return; }
+        var status = (xhr && typeof xhr.status !== \'undefined\') ? xhr.status : \'n/a\';
+        var body = (xhr && typeof xhr.responseText === \'string\') ? xhr.responseText : \'\';
+        if (body.length > 1200) {
+            body = body.slice(0, 1200) + \'...\';
+        }
+        dbg.style.display = \'block\';
+        dbg.textContent = ' . $lDebugPrefix . ' + \' [\' + label + \'] status=\' + status + (body ? (\'\\n\' + body) : \'\');
+    };
 
     form.addEventListener(\'submit\', function (e) {
         e.preventDefault();
         if (!form.checkValidity()) { form.reportValidity(); return; }
 
+        var fileInput = form.querySelector(\'input[name="INTERN_AUTENIMAGE_IMPORT_ZIP"]\');
+        var selectedFile = (fileInput && fileInput.files && fileInput.files.length) ? fileInput.files[0] : null;
+        if (selectedFile && clientMaxBytes > 0 && selectedFile.size > clientMaxBytes) {
+            wrap.style.display = \'block\';
+            bar.className      = \'progress-bar progress-bar-danger\';
+            bar.style.width    = \'100%\';
+            bar.setAttribute(\'aria-valuenow\', 100);
+            bar.textContent    = \'100%\';
+            txt.style.display  = \'none\';
+            res.className      = \'alert alert-danger\';
+            res.textContent    = ' . $lTooLargeClient . ';
+            res.style.display  = \'block\';
+            return;
+        }
+
         var key = Math.random().toString(36).slice(2) + Date.now().toString(36);
         var fd  = new FormData(form);
-        fd.append(\'internautenimage_ajax\', \'1\');
-        fd.append(\'internautenimage_action\', \'import\');
         fd.append(\'progress_key\', key);
 
         wrap.style.display = \'block\';
         res.style.display  = \'none\';
         res.textContent    = \'\';
+        if (dbg) {
+            dbg.style.display = \'none\';
+            dbg.textContent = \'\';
+        }
         bar.className      = \'progress-bar progress-bar-striped active\';
         bar.style.width    = \'2%\';
         bar.textContent    = \'0%\';
@@ -370,10 +423,15 @@ class InternautenImage extends Module
         txt.textContent    = ' . $lUploading . ';
         btn.disabled = true;
 
-        var poll = setInterval(function () {
+        var pollProgress = function () {
             var x = new XMLHttpRequest();
-            x.open(\'GET\', ajaxUrl + \'&internautenimage_ajax=1&internautenimage_action=get_progress&progress_key=\' + encodeURIComponent(key), true);
+            x.open(\'GET\', ajaxUrl + \'&internautenimage_ajax=1&internautenimage_action=get_progress&progress_key=\' + encodeURIComponent(key) + \'&_ts=\' + Date.now(), true);
+            x.setRequestHeader(\'Cache-Control\', \'no-cache\');
+            x.setRequestHeader(\'Pragma\', \'no-cache\');
             x.onload = function () {
+                if (x.status >= 400) {
+                    setDebug(\'progress\', x);
+                }
                 try {
                     var d = JSON.parse(x.responseText);
                     if (d.total > 0) {
@@ -382,14 +440,22 @@ class InternautenImage extends Module
                         bar.setAttribute(\'aria-valuenow\', p);
                         bar.textContent = p + \'%\';
                         txt.textContent = ' . $lImporting . ' + \' \' + d.current + \' / \' + d.total;
+                    } else if (uploadPhaseDone) {
+                        txt.textContent = ' . $lProcessing . ';
                     }
                 } catch (ex) {}
             };
+            x.onerror = function () {
+                setDebug(\'progress-network-error\', x);
+            };
             x.send();
-        }, 700);
+        };
+        pollProgress();
+        var poll = setInterval(pollProgress, 700);
 
         var xhr = new XMLHttpRequest();
-        xhr.open(\'POST\', ajaxUrl, true);
+        xhr.open(\'POST\', ajaxUrl + \'&internautenimage_ajax=1&internautenimage_action=import&progress_key=\' + encodeURIComponent(key), true);
+        xhr.timeout = 300000;
 
         xhr.upload.onprogress = function (e) {
             if (!e.lengthComputable || e.total === 0) { return; }
@@ -397,13 +463,21 @@ class InternautenImage extends Module
             if (e.loaded < e.total) {
                 bar.style.width = p + \'%\';
                 bar.textContent = p + \'%\';
+                txt.textContent = ' . $lUploadingPct . ' + Math.round((e.loaded / e.total) * 100) + \'%\';
             } else {
+                uploadPhaseDone = true;
                 txt.textContent = ' . $lProcessing . ';
             }
         };
 
+        xhr.upload.onloadend = function () {
+            uploadPhaseDone = true;
+            txt.textContent = ' . $lProcessing . ';
+        };
+
         xhr.onload = function () {
             clearInterval(poll);
+            setDebug(\'import\', xhr);
             bar.style.width = \'100%\';
             bar.setAttribute(\'aria-valuenow\', 100);
             bar.textContent = \'100%\';
@@ -437,10 +511,23 @@ class InternautenImage extends Module
 
         xhr.onerror = function () {
             clearInterval(poll);
+            setDebug(\'import-network-error\', xhr);
             bar.classList.remove(\'active\');
             bar.classList.add(\'progress-bar-danger\');
             res.className   = \'alert alert-danger\';
             res.textContent = ' . $lNetworkErr . ';
+            txt.style.display = \'none\';
+            res.style.display = \'block\';
+            btn.disabled = false;
+        };
+
+        xhr.ontimeout = function () {
+            clearInterval(poll);
+            setDebug(\'import-timeout\', xhr);
+            bar.classList.remove(\'active\');
+            bar.classList.add(\'progress-bar-danger\');
+            res.className   = \'alert alert-danger\';
+            res.textContent = ' . $lTimeoutErr . ';
             txt.style.display = \'none\';
             res.style.display = \'block\';
             btn.disabled = false;
@@ -594,12 +681,15 @@ class InternautenImage extends Module
     protected function importArchive($shopScope, $productFilter, $progressKey = '')
     {
         if (!isset($_FILES['INTERN_AUTENIMAGE_IMPORT_ZIP'])) {
+            if ($this->isPostTooLarge()) {
+                throw new Exception($this->getUploadLimitMessage());
+            }
             throw new Exception($this->l('No ZIP file provided.'));
         }
 
         $uploaded = $_FILES['INTERN_AUTENIMAGE_IMPORT_ZIP'];
         if ((int) $uploaded['error'] !== UPLOAD_ERR_OK) {
-            throw new Exception($this->l('File upload failed.'));
+            throw new Exception($this->getUploadErrorMessage((int) $uploaded['error']));
         }
 
         $originalName = (string) $uploaded['name'];
@@ -644,8 +734,10 @@ class InternautenImage extends Module
         }
 
         $totalFiles = count($files);
+        $progressTotalUnits = max(1, $totalFiles * 2);
+        $preparedFiles = 0;
         $processedFiles = 0;
-        $this->updateProgress($progressKey, 0, $totalFiles);
+        $this->updateProgress($progressKey, 0, $progressTotalUnits);
 
         $grouped = [];
         foreach ($files as $filePath) {
@@ -665,6 +757,11 @@ class InternautenImage extends Module
                 'path' => $filePath,
                 'index' => (int) $info['index'],
             ];
+
+            $preparedFiles++;
+            if (($preparedFiles % 5) === 0 || $preparedFiles === $totalFiles) {
+                $this->updateProgress($progressKey, $preparedFiles, $progressTotalUnits);
+            }
         }
 
         $imported = 0;
@@ -675,7 +772,7 @@ class InternautenImage extends Module
             if ($productId <= 0) {
                 $skipped += count($items);
                 $processedFiles += count($items);
-                $this->updateProgress($progressKey, $processedFiles, $totalFiles);
+                $this->updateProgress($progressKey, min($progressTotalUnits, $totalFiles + $processedFiles), $progressTotalUnits);
                 continue;
             }
 
@@ -692,7 +789,7 @@ class InternautenImage extends Module
             if (!Validate::isLoadedObject($product)) {
                 $skipped += count($items);
                 $processedFiles += count($items);
-                $this->updateProgress($progressKey, $processedFiles, $totalFiles);
+                $this->updateProgress($progressKey, min($progressTotalUnits, $totalFiles + $processedFiles), $progressTotalUnits);
                 continue;
             }
 
@@ -704,7 +801,9 @@ class InternautenImage extends Module
                     $skipped++;
                 }
                 $processedFiles++;
-                $this->updateProgress($progressKey, $processedFiles, $totalFiles);
+                if (($processedFiles % 3) === 0 || $processedFiles >= $totalFiles) {
+                    $this->updateProgress($progressKey, min($progressTotalUnits, $totalFiles + $processedFiles), $progressTotalUnits);
+                }
             }
         }
 
@@ -714,7 +813,7 @@ class InternautenImage extends Module
         }
         $skipped += max(0, $totalFiles - $knownCount);
 
-        $this->updateProgress($progressKey, $totalFiles, $totalFiles);
+        $this->updateProgress($progressKey, $progressTotalUnits, $progressTotalUnits);
         $this->removeDirectory($extractDir);
 
         return [
@@ -951,6 +1050,79 @@ class InternautenImage extends Module
         } while (file_exists($candidate));
 
         return $candidate;
+    }
+
+    protected function isPostTooLarge()
+    {
+        if (!isset($_SERVER['CONTENT_LENGTH'])) {
+            return false;
+        }
+
+        $contentLength = (int) $_SERVER['CONTENT_LENGTH'];
+        $postMaxSize = $this->iniSizeToBytes((string) ini_get('post_max_size'));
+
+        if ($postMaxSize <= 0) {
+            return false;
+        }
+
+        return $contentLength > $postMaxSize;
+    }
+
+    protected function iniSizeToBytes($value)
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return 0;
+        }
+
+        $last = strtolower(substr($value, -1));
+        $number = (float) $value;
+
+        switch ($last) {
+            case 'g':
+                $number *= 1024;
+                // no break
+            case 'm':
+                $number *= 1024;
+                // no break
+            case 'k':
+                $number *= 1024;
+                break;
+            default:
+                break;
+        }
+
+        return (int) round($number);
+    }
+
+    protected function getUploadLimitMessage()
+    {
+        return sprintf(
+            $this->l('Uploaded ZIP is too large. Server limits: upload_max_filesize=%s, post_max_size=%s.'),
+            (string) ini_get('upload_max_filesize'),
+            (string) ini_get('post_max_size')
+        );
+    }
+
+    protected function getUploadErrorMessage($errorCode)
+    {
+        switch ((int) $errorCode) {
+            case UPLOAD_ERR_INI_SIZE:
+            case UPLOAD_ERR_FORM_SIZE:
+                return $this->getUploadLimitMessage();
+            case UPLOAD_ERR_PARTIAL:
+                return $this->l('File upload was interrupted. Please try again.');
+            case UPLOAD_ERR_NO_FILE:
+                return $this->l('No ZIP file provided.');
+            case UPLOAD_ERR_NO_TMP_DIR:
+                return $this->l('Upload failed: temporary directory is missing on the server.');
+            case UPLOAD_ERR_CANT_WRITE:
+                return $this->l('Upload failed: server cannot write the uploaded file.');
+            case UPLOAD_ERR_EXTENSION:
+                return $this->l('Upload was blocked by a PHP extension.');
+            default:
+                return $this->l('File upload failed.');
+        }
     }
 
     protected function updateProgress($progressKey, $current, $total)
