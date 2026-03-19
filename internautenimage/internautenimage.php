@@ -63,7 +63,8 @@ class InternautenImage extends Module
                 try {
                     $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_SHOP_SCOPE', 'current');
                     $productFilter = (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all');
-                    $result = $this->importArchive($shopScope, $productFilter, $progressKey);
+                    $importMode = (string) Tools::getValue('INTERN_AUTENIMAGE_IMPORT_MODE', 'add');
+                    $result = $this->importArchive($shopScope, $productFilter, $progressKey, $importMode);
                     if ($progressKey !== '') {
                         @unlink(_PS_CACHE_DIR_ . 'internautenimage_progress_' . $progressKey . '.json');
                     }
@@ -86,7 +87,8 @@ class InternautenImage extends Module
             try {
                 $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_SHOP_SCOPE', 'current');
                 $productFilter = (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all');
-                $result = $this->importArchive($shopScope, $productFilter);
+                $importMode = (string) Tools::getValue('INTERN_AUTENIMAGE_IMPORT_MODE', 'add');
+                $result = $this->importArchive($shopScope, $productFilter, '', $importMode);
 
                 $html .= $this->displayConfirmation(
                     sprintf(
@@ -247,6 +249,21 @@ class InternautenImage extends Module
             ],
         ];
 
+        $importModeOptions = [
+            [
+                'id_option' => 'add',
+                'name' => $this->l('Add new images additionally'),
+            ],
+            [
+                'id_option' => 'skip',
+                'name' => $this->l('Skip products with existing images'),
+            ],
+            [
+                'id_option' => 'replace',
+                'name' => $this->l('Replace existing images'),
+            ],
+        ];
+
         $fieldsForm = [
             'form' => [
                 'legend' => [
@@ -278,6 +295,18 @@ class InternautenImage extends Module
                         ],
                     ],
                     [
+                        'type' => 'select',
+                        'label' => $this->l('Import mode'),
+                        'name' => 'INTERN_AUTENIMAGE_IMPORT_MODE',
+                        'required' => true,
+                        'options' => [
+                            'query' => $importModeOptions,
+                            'id' => 'id_option',
+                            'name' => 'name',
+                        ],
+                        'desc' => $this->l('Choose how to handle products that already have images.'),
+                    ],
+                    [
                         'type' => 'file',
                         'label' => $this->l('ZIP file'),
                         'name' => 'INTERN_AUTENIMAGE_IMPORT_ZIP',
@@ -305,6 +334,7 @@ class InternautenImage extends Module
         $helper->fields_value = [
             'INTERN_AUTENIMAGE_SHOP_SCOPE' => (string) Tools::getValue('INTERN_AUTENIMAGE_SHOP_SCOPE', 'current'),
             'INTERN_AUTENIMAGE_PRODUCT_FILTER' => (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all'),
+            'INTERN_AUTENIMAGE_IMPORT_MODE' => (string) Tools::getValue('INTERN_AUTENIMAGE_IMPORT_MODE', 'add'),
         ];
 
         $formHtml = $helper->generateForm([$fieldsForm]);
@@ -347,7 +377,7 @@ class InternautenImage extends Module
 
         $progressHtml = '
 <div id="internautenimage-progress-wrap" style="display:none;margin-top:15px;" class="panel">
-    <div class="panel-heading"><i class="icon-spinner icon-spin"></i> ' . $lProgress . '</div>
+    <div class="panel-heading"><i id="internautenimage-progress-icon" class="icon-spinner"></i> ' . $lProgress . '</div>
     <div class="panel-body">
         <div class="progress">
             <div id="internautenimage-progress-bar"
@@ -372,8 +402,14 @@ class InternautenImage extends Module
     var txt  = document.getElementById(\'internautenimage-progress-text\');
     var res  = document.getElementById(\'internautenimage-result\');
     var dbg  = document.getElementById(\'internautenimage-debug\');
+    var icon = document.getElementById(\'internautenimage-progress-icon\');
     var uploadPhaseDone = false;
     var clientMaxBytes = ' . $clientMaxBytesJs . ';
+
+    var setSpinnerActive = function (active, success) {
+        if (!icon) { return; }
+        icon.className = active ? \'icon-spinner icon-spin\' : (success ? \'icon-check\' : \'icon-remove\');
+    };
 
     var setDebug = function (label, xhr) {
         if (!dbg) { return; }
@@ -394,6 +430,7 @@ class InternautenImage extends Module
         var selectedFile = (fileInput && fileInput.files && fileInput.files.length) ? fileInput.files[0] : null;
         if (selectedFile && clientMaxBytes > 0 && selectedFile.size > clientMaxBytes) {
             wrap.style.display = \'block\';
+            setSpinnerActive(false, false);
             bar.className      = \'progress-bar progress-bar-danger\';
             bar.style.width    = \'100%\';
             bar.setAttribute(\'aria-valuenow\', 100);
@@ -410,6 +447,7 @@ class InternautenImage extends Module
         fd.append(\'progress_key\', key);
 
         wrap.style.display = \'block\';
+        setSpinnerActive(true, false);
         res.style.display  = \'none\';
         res.textContent    = \'\';
         if (dbg) {
@@ -455,7 +493,7 @@ class InternautenImage extends Module
 
         var xhr = new XMLHttpRequest();
         xhr.open(\'POST\', ajaxUrl + \'&internautenimage_ajax=1&internautenimage_action=import&progress_key=\' + encodeURIComponent(key), true);
-        xhr.timeout = 300000;
+        xhr.timeout = 0;
 
         xhr.upload.onprogress = function (e) {
             if (!e.lengthComputable || e.total === 0) { return; }
@@ -504,6 +542,7 @@ class InternautenImage extends Module
                 res.textContent = ' . $lServerErr . ';
             }
             if (!ok) { bar.classList.add(\'progress-bar-danger\'); }
+            setSpinnerActive(false, ok);
             txt.style.display = \'none\';
             res.style.display = \'block\';
             btn.disabled = false;
@@ -514,6 +553,7 @@ class InternautenImage extends Module
             setDebug(\'import-network-error\', xhr);
             bar.classList.remove(\'active\');
             bar.classList.add(\'progress-bar-danger\');
+            setSpinnerActive(false, false);
             res.className   = \'alert alert-danger\';
             res.textContent = ' . $lNetworkErr . ';
             txt.style.display = \'none\';
@@ -526,6 +566,7 @@ class InternautenImage extends Module
             setDebug(\'import-timeout\', xhr);
             bar.classList.remove(\'active\');
             bar.classList.add(\'progress-bar-danger\');
+            setSpinnerActive(false, false);
             res.className   = \'alert alert-danger\';
             res.textContent = ' . $lTimeoutErr . ';
             txt.style.display = \'none\';
@@ -678,8 +719,12 @@ class InternautenImage extends Module
         return $ids;
     }
 
-    protected function importArchive($shopScope, $productFilter, $progressKey = '')
+    protected function importArchive($shopScope, $productFilter, $progressKey = '', $importMode = 'add')
     {
+        @set_time_limit(0);
+        @ignore_user_abort(true);
+
+        $importMode = in_array($importMode, ['replace', 'skip', 'add'], true) ? $importMode : 'add';
         if (!isset($_FILES['INTERN_AUTENIMAGE_IMPORT_ZIP'])) {
             if ($this->isPostTooLarge()) {
                 throw new Exception($this->getUploadLimitMessage());
@@ -776,6 +821,19 @@ class InternautenImage extends Module
                 continue;
             }
 
+            $hasExistingImages = ($this->getNextImagePosition($productId) > 0);
+
+            if ($importMode === 'skip' && $hasExistingImages) {
+                $skipped += count($items);
+                $processedFiles += count($items);
+                $this->updateProgress($progressKey, min($progressTotalUnits, $totalFiles + $processedFiles), $progressTotalUnits);
+                continue;
+            }
+
+            if ($importMode === 'replace' && $hasExistingImages) {
+                $this->deleteProductImages($productId);
+            }
+
             usort($items, function ($a, $b) {
                 if ((int) $a['index'] === (int) $b['index']) {
                     return strcmp((string) $a['path'], (string) $b['path']);
@@ -820,6 +878,20 @@ class InternautenImage extends Module
             'imported' => (int) $imported,
             'skipped' => (int) $skipped,
         ];
+    }
+
+    protected function deleteProductImages($productId)
+    {
+        $rows = Db::getInstance()->executeS(
+            'SELECT id_image FROM ' . _DB_PREFIX_ . 'image WHERE id_product = ' . (int) $productId
+        );
+        if ($rows === false) {
+            return;
+        }
+        foreach ($rows as $row) {
+            $image = new Image((int) $row['id_image']);
+            $image->delete();
+        }
     }
 
     protected function collectImageFiles($directory)
