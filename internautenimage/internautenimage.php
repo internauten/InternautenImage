@@ -119,7 +119,73 @@ class InternautenImage extends Module
             $this->l('Export: Creates a ZIP with product images. Import: Accepts a ZIP, maps images by product reference, and sets image legends to the product name in all languages.')
         );
 
-        return $html . $this->renderExportForm() . $this->renderImportForm();
+        $shopScopeForInfo = (string) Tools::getValue('INTERN_AUTENIMAGE_SHOP_SCOPE', 'current');
+        $productFilterForInfo = (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all');
+        $shopScopeForInfo = $shopScopeForInfo === 'all' ? 'all' : 'current';
+        $productFilterForInfo = $productFilterForInfo === 'active' ? 'active' : 'all';
+
+        $shopScopeLabel = $shopScopeForInfo === 'all'
+            ? $this->l('All shops')
+            : $this->l('Current shop only');
+        $productFilterLabel = $productFilterForInfo === 'active'
+            ? $this->l('Active products only')
+            : $this->l('All products');
+
+        $productsWithoutImageCount = $this->getProductsWithoutImageCount($shopScopeForInfo, $productFilterForInfo);
+        $html .= $this->displayInformation(
+            sprintf(
+                $this->l('Products without images: %1$d (Shop scope: %2$s, Product filter: %3$s)'),
+                (int) $productsWithoutImageCount,
+                (string) $shopScopeLabel,
+                (string) $productFilterLabel
+            )
+        );
+
+        return $html
+            . $this->renderScopeSelectionForm($shopScopeForInfo, $productFilterForInfo)
+            . $this->renderExportForm()
+            . $this->renderImportForm();
+    }
+
+    protected function renderScopeSelectionForm($shopScope, $productFilter)
+    {
+        $shopScope = $shopScope === 'all' ? 'all' : 'current';
+        $productFilter = $productFilter === 'active' ? 'active' : 'all';
+
+        $actionUrl = $this->context->link->getAdminLink('AdminModules', true, [], [
+            'configure' => $this->name,
+        ]);
+
+        $html = '';
+        $html .= '<div class="panel">';
+        $html .= '<div class="panel-heading"><i class="icon-filter"></i> ' . $this->l('Scope preview') . '</div>';
+        $html .= '<div class="panel-body">';
+        $html .= '<p>' . $this->l('Change shop scope and product filter without starting export/import.') . '</p>';
+        $html .= '<form method="post" action="' . htmlspecialchars($actionUrl, ENT_QUOTES, 'UTF-8') . '">';
+        $html .= '<div class="row">';
+        $html .= '<div class="col-lg-4">';
+        $html .= '<label class="control-label" for="ii-scope-select">' . $this->l('Shop scope') . '</label>';
+        $html .= '<select id="ii-scope-select" name="INTERN_AUTENIMAGE_SHOP_SCOPE" class="form-control">';
+        $html .= '<option value="current"' . ($shopScope === 'current' ? ' selected="selected"' : '') . '>' . $this->l('Current shop only') . '</option>';
+        $html .= '<option value="all"' . ($shopScope === 'all' ? ' selected="selected"' : '') . '>' . $this->l('All shops') . '</option>';
+        $html .= '</select>';
+        $html .= '</div>';
+        $html .= '<div class="col-lg-4">';
+        $html .= '<label class="control-label" for="ii-filter-select">' . $this->l('Product filter') . '</label>';
+        $html .= '<select id="ii-filter-select" name="INTERN_AUTENIMAGE_PRODUCT_FILTER" class="form-control">';
+        $html .= '<option value="all"' . ($productFilter === 'all' ? ' selected="selected"' : '') . '>' . $this->l('All products') . '</option>';
+        $html .= '<option value="active"' . ($productFilter === 'active' ? ' selected="selected"' : '') . '>' . $this->l('Active products only') . '</option>';
+        $html .= '</select>';
+        $html .= '</div>';
+        $html .= '<div class="col-lg-4" style="padding-top:25px;">';
+        $html .= '<button type="submit" class="btn btn-default"><i class="icon-refresh"></i> ' . $this->l('Apply selection') . '</button>';
+        $html .= '</div>';
+        $html .= '</div>';
+        $html .= '</form>';
+        $html .= '</div>';
+        $html .= '</div>';
+
+        return $html;
     }
 
     protected function renderExportForm()
@@ -717,6 +783,38 @@ class InternautenImage extends Module
         }
 
         return $ids;
+    }
+
+    protected function getProductsWithoutImageCount($shopScope, $productFilter)
+    {
+        $shopScope = $shopScope === 'all' ? 'all' : 'current';
+        $productFilter = $productFilter === 'active' ? 'active' : 'all';
+        $onlyActive = $productFilter === 'active';
+
+        $query = new DbQuery();
+        $query->select('COUNT(DISTINCT p.id_product)');
+        $query->from('product', 'p');
+        $query->leftJoin('image', 'i', 'i.id_product = p.id_product');
+        $query->where('i.id_image IS NULL');
+
+        if (Shop::isFeatureActive()) {
+            $query->innerJoin('product_shop', 'ps', 'ps.id_product = p.id_product');
+
+            if ($shopScope === 'current') {
+                $query->where('ps.id_shop = ' . (int) $this->context->shop->id);
+            }
+
+            if ($onlyActive) {
+                $query->where('ps.active = 1');
+            }
+        }
+
+        $value = Db::getInstance()->getValue($query);
+        if ($value === false || $value === null || $value === '') {
+            return 0;
+        }
+
+        return (int) $value;
     }
 
     protected function importArchive($shopScope, $productFilter, $progressKey = '', $importMode = 'add')

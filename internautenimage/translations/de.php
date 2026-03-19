@@ -48,3 +48,16 @@ $_MODULE['<{internautenimage}prestashop>internautenimage_import_failed'] = 'Impo
 $_MODULE['<{internautenimage}prestashop>internautenimage_unknown_error'] = 'Ein unbekannter Fehler ist aufgetreten.';
 $_MODULE['<{internautenimage}prestashop>internautenimage_server_error'] = 'Serverfehler beim Import.';
 $_MODULE['<{internautenimage}prestashop>internautenimage_network_error'] = 'Netzwerkfehler beim Import.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_475ef3cc63b9aff24cb498e362ac9ed4'] = 'Internauten Produktbild-Export und -Import';
+$_MODULE['<{internautenimage}prestashop>internautenimage_eb86d4030ac19a8eb0a51431135965e9'] = 'Exportiert Produktbilder als ZIP direkt aus der PrestaShop-Konfigurationsseite und erlaubt den Import von Bildern aus einer ZIP-Datei.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_3c8342136885943f4bf888c69e1d9f88'] = 'Neue Bilder zusaetzlich hinzufuegen';
+$_MODULE['<{internautenimage}prestashop>internautenimage_6ae650e2a47feeb5ed607081f49b515f'] = 'Produkte mit bestehenden Bildern ueberspringen';
+$_MODULE['<{internautenimage}prestashop>internautenimage_72873760103b70cac30194c810a60483'] = 'Bestehende Bilder ersetzen';
+$_MODULE['<{internautenimage}prestashop>internautenimage_b622b3c2bd4167573c69775914e6bb1c'] = 'Import-Modus';
+$_MODULE['<{internautenimage}prestashop>internautenimage_3deb1d2de87415ae9f7b253ffcf2bf58'] = 'Waehle, wie bei Produkten mit bereits vorhandenen Bildern verfahren werden soll.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_bc668374341d8f9801e33dbd202f2128'] = 'Upload-Zeitlimit erreicht. Bitte versuche eine kleinere ZIP-Datei oder erhoehe die Server-Limits.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_51abaa2f84e666a5571f54848afb4378'] = 'ZIP ist groesser als die Server-Limits (upload_max_filesize=%s, post_max_size=%s).';
+$_MODULE['<{internautenimage}prestashop>internautenimage_3a146b09feda81ffa14281f326f4b249'] = 'Artikel ohne Bild: %1$d (Shop-Kontext: %2$s, Produktfilter: %3$s)';
+$_MODULE['<{internautenimage}prestashop>internautenimage_e24a8ee5d2adf23bb6296f62b2ccb357'] = 'Vorschau-Filter';
+$_MODULE['<{internautenimage}prestashop>internautenimage_952cabfc0dc5adc940d7ec7eb39bb96e'] = 'Shop-Kontext und Produktfilter aendern, ohne Export/Import zu starten.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_3e6719e42d67ebc5b675b21aa7845d9c'] = 'Auswahl anwenden';
