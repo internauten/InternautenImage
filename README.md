@@ -28,11 +28,11 @@ This project contains an installable PrestaShop module that exports product imag
 1. In Module Manager, click **Configure** on the module.
 2. Select language.
 3. Select shop scope:
-	- Current shop only
-	- All shops
+   - Current shop only
+   - All shops
 4. Select product filter:
-	- All products
-	- Active products only
+   - All products
+   - Active products only
 5. Click **Create and download ZIP**.
 6. The download starts directly in the browser.
 
@@ -88,11 +88,11 @@ The workflow then builds and uploads:
 - internautenimage-module-v1.1.2.zip
 
 ### via script
+
 ```bash
 cd scripts
 ./push-tag-from-module-version.sh
 ```
-
 
 ## Test nach Neustart
 
@@ -106,6 +106,25 @@ curl -I http://localhost:8080/de/
 
 ```bash
 docker exec prestashop php -r 'echo "upload_max_filesize=".ini_get("upload_max_filesize").PHP_EOL; echo "post_max_size=".ini_get("post_max_size").PHP_EOL;'
+```
+
+## Develope
+
+Dammit die Container bei jedem neuen Modul nicht jedesmal neu erstellt werden müssen, versuchen wir es mit symlinks.
+
+Voraussetzungen: im compose hat es unter volumes einen Eintrag - /home/dmo/internauten:/internauten
+
+Bash ins WSL2 und holen des Repos:
+
+```bash
+cd ~/internauten
+git clone https://github.com/internauten/InternautenImage.git
+```
+
+Bash in den Container und dann
+
+```bash
+ln -s /internauten/InternautenImage/internautenimage /var/www/html/modules/internautenimage
 ```
 
 ## License
