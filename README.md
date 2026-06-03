@@ -58,9 +58,10 @@ The module also supports category image export and import as ZIP:
 1. Choose shop scope.
 2. Export category images or upload a category ZIP.
 
-Category filename rule:
+Category filename rules:
 
 - `cat_<categoryId>.jpg` (example: `cat_12.jpg`)
+- `cat_pre_<categoryId>.jpg` (example: `cat_pre_12.jpg`)
 
 ## ZIP Naming Rules
 

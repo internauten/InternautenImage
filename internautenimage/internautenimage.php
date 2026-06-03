@@ -9,7 +9,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '1.1.1';
+        $this->version = '1.1.2';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -714,7 +714,7 @@ class InternautenImage extends Module
                         ],
                     ],
                 ],
-                'description' => $this->l('Exports category images as cat_<id>.jpg.'),
+                'description' => $this->l('Exports category images as cat_<id>.jpg and preview images as cat_pre_<id>.jpg.'),
                 'submit' => [
                     'title' => $this->l('Export category images'),
                     'class' => 'btn btn-primary pull-right',
@@ -775,10 +775,10 @@ class InternautenImage extends Module
                         'label' => $this->l('ZIP file'),
                         'name' => 'INTERN_AUTENIMAGE_CATEGORY_IMPORT_ZIP',
                         'required' => true,
-                        'desc' => $this->l('Use file names like cat_12.jpg where 12 is the category ID.'),
+                        'desc' => $this->l('Use file names like cat_12.jpg and cat_pre_12.jpg where 12 is the category ID.'),
                     ],
                 ],
-                'description' => $this->l('Imports category images by matching cat_<id> to the category ID.'),
+                'description' => $this->l('Imports category images by matching cat_<id> and cat_pre_<id> to the category ID.'),
                 'submit' => [
                     'title' => $this->l('Upload and import category ZIP'),
                     'class' => 'btn btn-default pull-right',
@@ -915,16 +915,18 @@ class InternautenImage extends Module
         $copiedFiles = 0;
 
         foreach ($categoryIds as $categoryId) {
-            $sourcePath = _PS_CAT_IMG_DIR_ . (int) $categoryId . '.jpg';
-            if (!is_file($sourcePath)) {
-                continue;
-            }
+            foreach ($this->getCategoryImageExportVariants() as $variant) {
+                $sourcePath = $this->getCategoryImageSourcePath((int) $categoryId, (string) $variant['prefix']);
+                if (!is_file($sourcePath)) {
+                    continue;
+                }
 
-            $filename = 'cat_' . (int) $categoryId . '.jpg';
-            $targetPath = $tempDir . $filename;
+                $filename = $this->getCategoryImageFilename((int) $categoryId, (string) $variant['prefix']);
+                $targetPath = $tempDir . $filename;
 
-            if (@copy($sourcePath, $targetPath)) {
-                $copiedFiles++;
+                if (@copy($sourcePath, $targetPath)) {
+                    $copiedFiles++;
+                }
             }
         }
 
@@ -1258,7 +1260,9 @@ class InternautenImage extends Module
 
         foreach ($files as $filePath) {
             $filename = basename($filePath);
-            $categoryId = $this->parseCategoryIdFromFilename($filename);
+            $categoryImageInfo = $this->parseCategoryImageFromFilename($filename);
+            $categoryId = (int) $categoryImageInfo['id_category'];
+            $variantPrefix = (string) $categoryImageInfo['prefix'];
 
             if ($categoryId <= 0) {
                 $skipped++;
@@ -1278,7 +1282,7 @@ class InternautenImage extends Module
                 continue;
             }
 
-            if ($this->importSingleCategoryImage($categoryId, $filePath)) {
+            if ($this->importSingleCategoryImage($categoryId, $filePath, $variantPrefix)) {
                 $imported++;
             } else {
                 $skipped++;
@@ -1315,7 +1319,7 @@ class InternautenImage extends Module
             $reasonKey = isset($entry['reason']) ? (string) $entry['reason'] : '';
 
             if ($reasonKey === 'invalid_name') {
-                $reason = $this->l('File name must match cat_<id> (for example cat_12.jpg).');
+                $reason = $this->l('File name must match cat_<id> or cat_pre_<id> (for example cat_12.jpg).');
             } elseif ($reasonKey === 'out_of_scope_or_missing') {
                 $reason = $this->l('Category does not exist or is not in the selected shop scope.');
             } else {
@@ -1507,14 +1511,42 @@ class InternautenImage extends Module
         return $ids;
     }
 
-    protected function parseCategoryIdFromFilename($filename)
+    protected function getCategoryImageExportVariants()
+    {
+        return [
+            ['prefix' => ''],
+            ['prefix' => 'pre_'],
+        ];
+    }
+
+    protected function getCategoryImageFilename($categoryId, $prefix = '')
+    {
+        $prefix = $prefix === 'pre_' ? 'pre_' : '';
+
+        return 'cat_' . $prefix . (int) $categoryId . '.jpg';
+    }
+
+    protected function getCategoryImageSourcePath($categoryId, $prefix = '')
+    {
+        $prefix = $prefix === 'pre_' ? 'pre_' : '';
+
+        return _PS_CAT_IMG_DIR_ . $prefix . (int) $categoryId . '.jpg';
+    }
+
+    protected function parseCategoryImageFromFilename($filename)
     {
         $base = (string) pathinfo((string) $filename, PATHINFO_FILENAME);
-        if (preg_match('/^cat_([0-9]+)$/i', $base, $matches)) {
-            return (int) $matches[1];
+        if (preg_match('/^cat_(pre_)?([0-9]+)$/i', $base, $matches)) {
+            return [
+                'prefix' => !empty($matches[1]) ? 'pre_' : '',
+                'id_category' => (int) $matches[2],
+            ];
         }
 
-        return 0;
+        return [
+            'prefix' => '',
+            'id_category' => 0,
+        ];
     }
 
     protected function isCategoryInScope($categoryId, $shopScope)
@@ -1543,13 +1575,13 @@ class InternautenImage extends Module
         return $exists === $categoryId;
     }
 
-    protected function importSingleCategoryImage($categoryId, $sourcePath)
+    protected function importSingleCategoryImage($categoryId, $sourcePath, $prefix = '')
     {
         if (!is_file($sourcePath) || (int) $categoryId <= 0) {
             return false;
         }
 
-        $targetPath = _PS_CAT_IMG_DIR_ . (int) $categoryId . '.jpg';
+        $targetPath = $this->getCategoryImageSourcePath((int) $categoryId, $prefix);
         if (!ImageManager::resize($sourcePath, $targetPath)) {
             return false;
         }
