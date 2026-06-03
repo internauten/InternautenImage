@@ -51,6 +51,17 @@ Import Rules:
 - Suffixes `_1`, `_2` are interpreted as 2nd, 3rd, ... image order.
 - Image legend is set to the product name in all languages.
 
+## Category Image Export/Import
+
+The module also supports category image export and import as ZIP:
+
+1. Choose shop scope.
+2. Export category images or upload a category ZIP.
+
+Category filename rule:
+
+- `cat_<categoryId>.jpg` (example: `cat_12.jpg`)
+
 ## ZIP Naming Rules
 
 - First image of a product: `REFERENCE.jpg`

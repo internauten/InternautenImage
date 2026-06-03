@@ -2,11 +2,10 @@
 <module>
     <name>internautenimage</name>
     <displayName><![CDATA[Internauten Produktbild-Export und -Import]]></displayName>
-    <version><![CDATA[1.0.1]]></version>
+    <version><![CDATA[1.1.0]]></version>
     <description><![CDATA[Exportiert Produktbilder als ZIP direkt aus der PrestaShop-Konfigurationsseite und erlaubt den Import von Bildern aus einer ZIP-Datei.]]></description>
     <author><![CDATA[die.internauten.ch GmbH]]></author>
     <tab><![CDATA[administration]]></tab>
     <is_configurable>1</is_configurable>
     <need_instance>0</need_instance>
-	<limited_countries></limited_countries>
 </module>

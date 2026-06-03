@@ -9,7 +9,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '1.0.1';
+        $this->version = '1.1.1';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -115,6 +115,38 @@ class InternautenImage extends Module
             }
         }
 
+        if (Tools::isSubmit('submitInternautenCategoryImageExport')) {
+            try {
+                $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_CATEGORY_SHOP_SCOPE', 'current');
+                $zipPath = $this->buildCategoryArchive($shopScope);
+                $this->sendArchive($zipPath, 'internauten_category_images');
+                exit;
+            } catch (Exception $e) {
+                $html .= $this->displayError($this->l('Category export failed: ') . $e->getMessage());
+            }
+        }
+
+        if (Tools::isSubmit('submitInternautenCategoryImageImport')) {
+            try {
+                $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_CATEGORY_SHOP_SCOPE', 'current');
+                $result = $this->importCategoryArchive($shopScope);
+
+                $html .= $this->displayConfirmation(
+                    sprintf(
+                        $this->l('Category import completed. %d images imported, %d files skipped.'),
+                        (int) $result['imported'],
+                        (int) $result['skipped']
+                    )
+                );
+
+                if (!empty($result['details']) && is_array($result['details'])) {
+                    $html .= $this->displayWarning($this->buildCategoryImportDetailsHtml($result['details']));
+                }
+            } catch (Exception $e) {
+                $html .= $this->displayError($this->l('Category import failed: ') . $e->getMessage());
+            }
+        }
+
         $html .= $this->displayInformation(
             $this->l('Export: Creates a ZIP with product images. Import: Accepts a ZIP, maps images by product reference, and sets image legends to the product name in all languages.')
         );
@@ -144,7 +176,9 @@ class InternautenImage extends Module
         return $html
             . $this->renderScopeSelectionForm($shopScopeForInfo, $productFilterForInfo)
             . $this->renderExportForm()
-            . $this->renderImportForm();
+            . $this->renderImportForm()
+            . $this->renderCategoryExportForm()
+            . $this->renderCategoryImportForm();
     }
 
     protected function renderScopeSelectionForm($shopScope, $productFilter)
@@ -648,6 +682,126 @@ class InternautenImage extends Module
         return $formHtml . $progressHtml;
     }
 
+    protected function renderCategoryExportForm()
+    {
+        $shopScopeOptions = [
+            [
+                'id_option' => 'current',
+                'name' => $this->l('Current shop only'),
+            ],
+            [
+                'id_option' => 'all',
+                'name' => $this->l('All shops'),
+            ],
+        ];
+
+        $fieldsForm = [
+            'form' => [
+                'legend' => [
+                    'title' => $this->l('Category Image Export (ZIP Download)'),
+                    'icon' => 'icon-folder-open',
+                ],
+                'input' => [
+                    [
+                        'type' => 'select',
+                        'label' => $this->l('Shop scope'),
+                        'name' => 'INTERN_AUTENIMAGE_CATEGORY_SHOP_SCOPE',
+                        'required' => true,
+                        'options' => [
+                            'query' => $shopScopeOptions,
+                            'id' => 'id_option',
+                            'name' => 'name',
+                        ],
+                    ],
+                ],
+                'description' => $this->l('Exports category images as cat_<id>.jpg.'),
+                'submit' => [
+                    'title' => $this->l('Export category images'),
+                    'class' => 'btn btn-primary pull-right',
+                    'name' => 'submitInternautenCategoryImageExport',
+                ],
+            ],
+        ];
+
+        $helper = new HelperForm();
+        $helper->show_toolbar = false;
+        $helper->table = $this->table;
+        $helper->module = $this;
+        $helper->identifier = $this->identifier;
+        $helper->submit_action = 'submitInternautenCategoryImageExport';
+        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->fields_value = [
+            'INTERN_AUTENIMAGE_CATEGORY_SHOP_SCOPE' => (string) Tools::getValue('INTERN_AUTENIMAGE_CATEGORY_SHOP_SCOPE', 'current'),
+        ];
+
+        return $helper->generateForm([$fieldsForm]);
+    }
+
+    protected function renderCategoryImportForm()
+    {
+        $shopScopeOptions = [
+            [
+                'id_option' => 'current',
+                'name' => $this->l('Current shop only'),
+            ],
+            [
+                'id_option' => 'all',
+                'name' => $this->l('All shops'),
+            ],
+        ];
+
+        $fieldsForm = [
+            'form' => [
+                'legend' => [
+                    'title' => $this->l('Category Image Import (ZIP Upload)'),
+                    'icon' => 'icon-folder-open',
+                ],
+                'enctype' => 'multipart/form-data',
+                'input' => [
+                    [
+                        'type' => 'select',
+                        'label' => $this->l('Shop scope'),
+                        'name' => 'INTERN_AUTENIMAGE_CATEGORY_SHOP_SCOPE',
+                        'required' => true,
+                        'options' => [
+                            'query' => $shopScopeOptions,
+                            'id' => 'id_option',
+                            'name' => 'name',
+                        ],
+                    ],
+                    [
+                        'type' => 'file',
+                        'label' => $this->l('ZIP file'),
+                        'name' => 'INTERN_AUTENIMAGE_CATEGORY_IMPORT_ZIP',
+                        'required' => true,
+                        'desc' => $this->l('Use file names like cat_12.jpg where 12 is the category ID.'),
+                    ],
+                ],
+                'description' => $this->l('Imports category images by matching cat_<id> to the category ID.'),
+                'submit' => [
+                    'title' => $this->l('Upload and import category ZIP'),
+                    'class' => 'btn btn-default pull-right',
+                    'name' => 'submitInternautenCategoryImageImport',
+                ],
+            ],
+        ];
+
+        $helper = new HelperForm();
+        $helper->show_toolbar = false;
+        $helper->table = $this->table;
+        $helper->module = $this;
+        $helper->identifier = $this->identifier;
+        $helper->submit_action = 'submitInternautenCategoryImageImport';
+        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->fields_value = [
+            'INTERN_AUTENIMAGE_CATEGORY_SHOP_SCOPE' => (string) Tools::getValue('INTERN_AUTENIMAGE_CATEGORY_SHOP_SCOPE', 'current'),
+        ];
+
+        return $helper->generateForm([$fieldsForm]);
+    }
+
     protected function buildArchive($langId, $shopScope, $productFilter)
     {
         @set_time_limit(0);
@@ -715,6 +869,71 @@ class InternautenImage extends Module
         }
 
         $zipPath = _PS_CACHE_DIR_ . 'internauten_produktbilder_export_' . date('Ymd_His') . '.zip';
+
+        $zip = new ZipArchive();
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            $this->removeDirectory($tempDir);
+            throw new Exception($this->l('ZIP file could not be created.'));
+        }
+
+        $files = scandir($tempDir);
+        if ($files !== false) {
+            foreach ($files as $file) {
+                if ($file === '.' || $file === '..') {
+                    continue;
+                }
+
+                $path = $tempDir . $file;
+                if (is_file($path)) {
+                    $zip->addFile($path, $file);
+                }
+            }
+        }
+
+        $zip->close();
+        $this->removeDirectory($tempDir);
+
+        if (!is_file($zipPath)) {
+            throw new Exception($this->l('ZIP file was not generated.'));
+        }
+
+        return $zipPath;
+    }
+
+    protected function buildCategoryArchive($shopScope)
+    {
+        @set_time_limit(0);
+
+        $shopScope = $shopScope === 'all' ? 'all' : 'current';
+
+        $tempDir = _PS_CACHE_DIR_ . 'internautenimage_cat_' . uniqid('', true) . DIRECTORY_SEPARATOR;
+        if (!@mkdir($tempDir, 0775, true) && !is_dir($tempDir)) {
+            throw new Exception($this->l('Temporary directory could not be created.'));
+        }
+
+        $categoryIds = $this->getCategoryIdsForScope($shopScope);
+        $copiedFiles = 0;
+
+        foreach ($categoryIds as $categoryId) {
+            $sourcePath = _PS_CAT_IMG_DIR_ . (int) $categoryId . '.jpg';
+            if (!is_file($sourcePath)) {
+                continue;
+            }
+
+            $filename = 'cat_' . (int) $categoryId . '.jpg';
+            $targetPath = $tempDir . $filename;
+
+            if (@copy($sourcePath, $targetPath)) {
+                $copiedFiles++;
+            }
+        }
+
+        if ($copiedFiles === 0) {
+            $this->removeDirectory($tempDir);
+            throw new Exception($this->l('No category images found.'));
+        }
+
+        $zipPath = _PS_CACHE_DIR_ . 'internauten_kategoriebilder_export_' . date('Ymd_His') . '.zip';
 
         $zip = new ZipArchive();
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
@@ -978,6 +1197,145 @@ class InternautenImage extends Module
         ];
     }
 
+    protected function importCategoryArchive($shopScope)
+    {
+        @set_time_limit(0);
+
+        if (!isset($_FILES['INTERN_AUTENIMAGE_CATEGORY_IMPORT_ZIP'])) {
+            if ($this->isPostTooLarge()) {
+                throw new Exception($this->getUploadLimitMessage());
+            }
+            throw new Exception($this->l('No ZIP file provided.'));
+        }
+
+        $uploaded = $_FILES['INTERN_AUTENIMAGE_CATEGORY_IMPORT_ZIP'];
+        if ((int) $uploaded['error'] !== UPLOAD_ERR_OK) {
+            throw new Exception($this->getUploadErrorMessage((int) $uploaded['error']));
+        }
+
+        $originalName = (string) $uploaded['name'];
+        if (strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION)) !== 'zip') {
+            throw new Exception($this->l('Please upload a ZIP file.'));
+        }
+
+        $tmpZipPath = _PS_CACHE_DIR_ . 'internautenimage_category_import_' . uniqid('', true) . '.zip';
+        if (!@move_uploaded_file((string) $uploaded['tmp_name'], $tmpZipPath)) {
+            throw new Exception($this->l('Uploaded file could not be processed.'));
+        }
+
+        $extractDir = _PS_CACHE_DIR_ . 'internautenimage_category_extract_' . uniqid('', true) . DIRECTORY_SEPARATOR;
+        if (!@mkdir($extractDir, 0775, true) && !is_dir($extractDir)) {
+            @unlink($tmpZipPath);
+            throw new Exception($this->l('Temporary extraction directory could not be created.'));
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($tmpZipPath) !== true) {
+            @unlink($tmpZipPath);
+            $this->removeDirectory($extractDir);
+            throw new Exception($this->l('ZIP file could not be opened.'));
+        }
+
+        if (!$zip->extractTo($extractDir)) {
+            $zip->close();
+            @unlink($tmpZipPath);
+            $this->removeDirectory($extractDir);
+            throw new Exception($this->l('ZIP file could not be extracted.'));
+        }
+        $zip->close();
+        @unlink($tmpZipPath);
+
+        $shopScope = $shopScope === 'all' ? 'all' : 'current';
+        $files = $this->collectImageFiles($extractDir);
+        if (empty($files)) {
+            $this->removeDirectory($extractDir);
+            throw new Exception($this->l('No image files found in the ZIP.'));
+        }
+
+        $imported = 0;
+        $skipped = 0;
+        $details = [];
+
+        foreach ($files as $filePath) {
+            $filename = basename($filePath);
+            $categoryId = $this->parseCategoryIdFromFilename($filename);
+
+            if ($categoryId <= 0) {
+                $skipped++;
+                $details[] = [
+                    'file' => $filename,
+                    'reason' => 'invalid_name',
+                ];
+                continue;
+            }
+
+            if (!$this->isCategoryInScope($categoryId, $shopScope)) {
+                $skipped++;
+                $details[] = [
+                    'file' => $filename,
+                    'reason' => 'out_of_scope_or_missing',
+                ];
+                continue;
+            }
+
+            if ($this->importSingleCategoryImage($categoryId, $filePath)) {
+                $imported++;
+            } else {
+                $skipped++;
+                $details[] = [
+                    'file' => $filename,
+                    'reason' => 'processing_failed',
+                ];
+            }
+        }
+
+        $this->removeDirectory($extractDir);
+
+        return [
+            'imported' => (int) $imported,
+            'skipped' => (int) $skipped,
+            'details' => $details,
+        ];
+    }
+
+    protected function buildCategoryImportDetailsHtml(array $details)
+    {
+        if (empty($details)) {
+            return '';
+        }
+
+        $limit = 20;
+        $visible = array_slice($details, 0, $limit);
+
+        $html = '<strong>' . $this->l('Skipped category files:') . '</strong>';
+        $html .= '<ul style="margin-top:8px;">';
+
+        foreach ($visible as $entry) {
+            $file = isset($entry['file']) ? (string) $entry['file'] : '';
+            $reasonKey = isset($entry['reason']) ? (string) $entry['reason'] : '';
+
+            if ($reasonKey === 'invalid_name') {
+                $reason = $this->l('File name must match cat_<id> (for example cat_12.jpg).');
+            } elseif ($reasonKey === 'out_of_scope_or_missing') {
+                $reason = $this->l('Category does not exist or is not in the selected shop scope.');
+            } else {
+                $reason = $this->l('Image could not be processed.');
+            }
+
+            $html .= '<li><code>' . htmlspecialchars($file, ENT_QUOTES, 'UTF-8') . '</code>: '
+                . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8') . '</li>';
+        }
+
+        $html .= '</ul>';
+
+        if (count($details) > $limit) {
+            $remaining = count($details) - $limit;
+            $html .= '<p>' . sprintf($this->l('... and %d more skipped files.'), (int) $remaining) . '</p>';
+        }
+
+        return $html;
+    }
+
     protected function deleteProductImages($productId)
     {
         $rows = Db::getInstance()->executeS(
@@ -1109,6 +1467,107 @@ class InternautenImage extends Module
         return ((int) $maxValue) + 1;
     }
 
+    protected function getCategoryIdsForScope($shopScope)
+    {
+        $db = Db::getInstance();
+        $shopScope = $shopScope === 'all' ? 'all' : 'current';
+
+        if (Shop::isFeatureActive()) {
+            if ($shopScope === 'current') {
+                $shopId = (int) $this->context->shop->id;
+                $rows = $db->executeS(
+                    'SELECT DISTINCT cs.id_category FROM ' . _DB_PREFIX_ . 'category_shop cs '
+                    . 'WHERE cs.id_shop = ' . $shopId . ' ORDER BY cs.id_category ASC'
+                );
+            } else {
+                $rows = $db->executeS(
+                    'SELECT DISTINCT cs.id_category FROM ' . _DB_PREFIX_ . 'category_shop cs ORDER BY cs.id_category ASC'
+                );
+            }
+        } else {
+            $rows = $db->executeS(
+                'SELECT c.id_category FROM ' . _DB_PREFIX_ . 'category c ORDER BY c.id_category ASC'
+            );
+        }
+
+        if ($rows === false) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($rows as $row) {
+            if (isset($row['id_category'])) {
+                $id = (int) $row['id_category'];
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            }
+        }
+
+        return $ids;
+    }
+
+    protected function parseCategoryIdFromFilename($filename)
+    {
+        $base = (string) pathinfo((string) $filename, PATHINFO_FILENAME);
+        if (preg_match('/^cat_([0-9]+)$/i', $base, $matches)) {
+            return (int) $matches[1];
+        }
+
+        return 0;
+    }
+
+    protected function isCategoryInScope($categoryId, $shopScope)
+    {
+        $categoryId = (int) $categoryId;
+        if ($categoryId <= 0) {
+            return false;
+        }
+
+        $shopScope = $shopScope === 'all' ? 'all' : 'current';
+
+        if (!Shop::isFeatureActive() || $shopScope === 'all') {
+            $exists = (int) Db::getInstance()->getValue(
+                'SELECT c.id_category FROM ' . _DB_PREFIX_ . 'category c WHERE c.id_category = ' . $categoryId
+            );
+
+            return $exists === $categoryId;
+        }
+
+        $shopId = (int) $this->context->shop->id;
+        $exists = (int) Db::getInstance()->getValue(
+            'SELECT cs.id_category FROM ' . _DB_PREFIX_ . 'category_shop cs '
+            . 'WHERE cs.id_category = ' . $categoryId . ' AND cs.id_shop = ' . $shopId
+        );
+
+        return $exists === $categoryId;
+    }
+
+    protected function importSingleCategoryImage($categoryId, $sourcePath)
+    {
+        if (!is_file($sourcePath) || (int) $categoryId <= 0) {
+            return false;
+        }
+
+        $targetPath = _PS_CAT_IMG_DIR_ . (int) $categoryId . '.jpg';
+        if (!ImageManager::resize($sourcePath, $targetPath)) {
+            return false;
+        }
+
+        $types = ImageType::getImagesTypes('categories');
+        foreach ($types as $type) {
+            $thumbPath = _PS_CAT_IMG_DIR_ . (int) $categoryId . '-' . stripslashes((string) $type['name']) . '.jpg';
+            ImageManager::resize(
+                $targetPath,
+                $thumbPath,
+                (int) $type['width'],
+                (int) $type['height']
+            );
+        }
+
+        return true;
+    }
+
     protected function importSingleProductImage(Product $product, $sourcePath, $position)
     {
         if (!is_file($sourcePath)) {
@@ -1170,9 +1629,9 @@ class InternautenImage extends Module
         return $legend;
     }
 
-    protected function sendArchive($zipPath)
+    protected function sendArchive($zipPath, $downloadPrefix = 'internauten_product_images')
     {
-        $downloadName = 'internauten_product_images_' . date('Ymd_His') . '.zip';
+        $downloadName = (string) $downloadPrefix . '_' . date('Ymd_His') . '.zip';
         $size = (string) filesize($zipPath);
 
         header('Content-Type: application/zip');
