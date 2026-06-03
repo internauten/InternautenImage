@@ -9,7 +9,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '1.1.2';
+        $this->version = '1.1.3';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -1530,7 +1530,11 @@ class InternautenImage extends Module
     {
         $prefix = $prefix === 'pre_' ? 'pre_' : '';
 
-        return _PS_CAT_IMG_DIR_ . $prefix . (int) $categoryId . '.jpg';
+        if ($prefix === 'pre_') {
+            return _PS_CAT_IMG_DIR_ . (int) $categoryId . '_thumb.jpg';
+        }
+
+        return _PS_CAT_IMG_DIR_ . (int) $categoryId . '.jpg';
     }
 
     protected function parseCategoryImageFromFilename($filename)
@@ -1582,6 +1586,10 @@ class InternautenImage extends Module
         }
 
         $targetPath = $this->getCategoryImageSourcePath((int) $categoryId, $prefix);
+        if ($prefix === 'pre_') {
+            return (bool) @copy($sourcePath, $targetPath) || ImageManager::resize($sourcePath, $targetPath);
+        }
+
         if (!ImageManager::resize($sourcePath, $targetPath)) {
             return false;
         }
