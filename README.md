@@ -20,7 +20,7 @@ This project contains an installable PrestaShop module that exports product imag
 
 1. In the PrestaShop back office, go to **Modules > Module Manager**.
 2. Click **Upload a module**.
-3. Upload `internautenimage-module-1.1.1.zip`.
+3. Upload `internautenimage-module-x.x.x.zip`.
 4. Install **Internauten Product Image Export**.
 
 ## Usage in Configuration Page
@@ -106,38 +106,26 @@ cd scripts
 ./tag-release.sh
 ```
 
-## Test nach Neustart
+## Weiteres/Zukünftiges
 
-```bash
-docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-```
+Frage: muss nach dem bild upload die "Wiederherstellen der Vorschaubilder" ausgeführt werden?
 
-```bash
-curl -I http://localhost:8080/de/
-```
+Nein – im Normalfall nicht.
 
-```bash
-docker exec prestashop php -r 'echo "upload_max_filesize=".ini_get("upload_max_filesize").PHP_EOL; echo "post_max_size=".ini_get("post_max_size").PHP_EOL;'
-```
+`importSingleProductImage()` erzeugt nach dem Anlegen des `Image`-Objekts bereits selbst alle Thumbnails: es speichert das Original als `.jpg` und rendert danach für jeden Eintrag aus `ImageType::getImagesTypes('products')` die passende Grösse (`internautenimage.php:1734-1743`). Anschliessend läuft noch `actionWatermark`, sodass auch Wasserzeichen-Module greifen. Für Kategoriebilder passiert dasselbe in `importSingleCategoryImage()`.
+
+Regenerieren ist nur in diesen Fällen nötig:
+
+- **PS 8.1+ mit WebP/AVIF**: Ist unter Design > Bildereinstellungen ein anderes Format als JPEG aktiv, fehlen die `.webp`/`.avif`-Varianten, da das Modul nur `.jpg` schreibt.
+- **High-DPI-Bilder** (`_2x`-Varianten), falls in deiner Shop-Konfiguration aktiviert.
+- Wenn du **nach** dem Import einen neuen Bildtyp anlegst oder Masse änderst.
+- Wenn einzelne Dateien laut Skip-Liste als „Bild konnte nicht verarbeitet werden" gemeldet wurden und du danach manuell nachbesserst.
+
+Wenn dein Shop auf WebP/AVIF läuft, kann ich den Import so erweitern, dass er die konfigurierten Formate direkt mitgeneriert – dann entfällt der Regenerierungslauf ganz.
 
 ## Develope
 
-Dammit die Container bei jedem neuen Modul nicht jedesmal neu erstellt werden müssen, versuchen wir es mit symlinks.
-
-Voraussetzungen: im compose hat es unter volumes einen Eintrag - /home/dmo/internauten:/internauten
-
-Bash ins WSL2 und holen des Repos:
-
-```bash
-cd ~/internauten
-git clone https://github.com/internauten/InternautenImage.git
-```
-
-Bash in den Container und dann
-
-```bash
-ln -s /internauten/InternautenImage/internautenimage /var/www/html/modules/internautenimage
-```
+Verfahren wie in [`WoWGetPrestaLocal`](https://github.com/internauten/WoWGetPrestaLocal).
 
 ## License
 
