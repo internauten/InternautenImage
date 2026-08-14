@@ -9,7 +9,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '1.1.3';
+        $this->version = '1.1.4';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -63,13 +63,21 @@ class InternautenImage extends Module
                 try {
                     $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_SHOP_SCOPE', 'current');
                     $productFilter = (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all');
-                    $importMode = (string) Tools::getValue('INTERN_AUTENIMAGE_IMPORT_MODE', 'add');
+                    $importMode = (string) Tools::getValue('INTERN_AUTENIMAGE_IMPORT_MODE', 'replace');
                     $result = $this->importArchive($shopScope, $productFilter, $progressKey, $importMode);
                     if ($progressKey !== '') {
                         @unlink(_PS_CACHE_DIR_ . 'internautenimage_progress_' . $progressKey . '.json');
                     }
+                    $detailsHtml = (!empty($result['details']) && is_array($result['details']))
+                        ? $this->buildImportDetailsHtml($result['details'])
+                        : '';
                     header('Content-Type: application/json');
-                    echo json_encode(['success' => true, 'imported' => (int) $result['imported'], 'skipped' => (int) $result['skipped']]);
+                    echo json_encode([
+                        'success' => true,
+                        'imported' => (int) $result['imported'],
+                        'skipped' => (int) $result['skipped'],
+                        'details_html' => $detailsHtml,
+                    ]);
                 } catch (Exception $e) {
                     if ($progressKey !== '') {
                         @unlink(_PS_CACHE_DIR_ . 'internautenimage_progress_' . $progressKey . '.json');
@@ -87,7 +95,7 @@ class InternautenImage extends Module
             try {
                 $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_SHOP_SCOPE', 'current');
                 $productFilter = (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all');
-                $importMode = (string) Tools::getValue('INTERN_AUTENIMAGE_IMPORT_MODE', 'add');
+                $importMode = (string) Tools::getValue('INTERN_AUTENIMAGE_IMPORT_MODE', 'replace');
                 $result = $this->importArchive($shopScope, $productFilter, '', $importMode);
 
                 $html .= $this->displayConfirmation(
@@ -97,6 +105,10 @@ class InternautenImage extends Module
                         (int) $result['skipped']
                     )
                 );
+
+                if (!empty($result['details']) && is_array($result['details'])) {
+                    $html .= $this->displayWarning($this->buildImportDetailsHtml($result['details']));
+                }
             } catch (Exception $e) {
                 $html .= $this->displayError($this->l('Import failed: ') . $e->getMessage());
             }
@@ -351,16 +363,16 @@ class InternautenImage extends Module
 
         $importModeOptions = [
             [
+                'id_option' => 'replace',
+                'name' => $this->l('Replace existing images'),
+            ],
+            [
                 'id_option' => 'add',
                 'name' => $this->l('Add new images additionally'),
             ],
             [
                 'id_option' => 'skip',
                 'name' => $this->l('Skip products with existing images'),
-            ],
-            [
-                'id_option' => 'replace',
-                'name' => $this->l('Replace existing images'),
             ],
         ];
 
@@ -434,7 +446,7 @@ class InternautenImage extends Module
         $helper->fields_value = [
             'INTERN_AUTENIMAGE_SHOP_SCOPE' => (string) Tools::getValue('INTERN_AUTENIMAGE_SHOP_SCOPE', 'current'),
             'INTERN_AUTENIMAGE_PRODUCT_FILTER' => (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all'),
-            'INTERN_AUTENIMAGE_IMPORT_MODE' => (string) Tools::getValue('INTERN_AUTENIMAGE_IMPORT_MODE', 'add'),
+            'INTERN_AUTENIMAGE_IMPORT_MODE' => (string) Tools::getValue('INTERN_AUTENIMAGE_IMPORT_MODE', 'replace'),
         ];
 
         $formHtml = $helper->generateForm([$fieldsForm]);
@@ -487,6 +499,7 @@ class InternautenImage extends Module
         </div>
         <p id="internautenimage-progress-text" style="margin-top:8px;"></p>
         <div id="internautenimage-result" style="display:none;margin-top:10px;"></div>
+        <div id="internautenimage-details" style="display:none;margin-top:10px;max-height:320px;overflow:auto;"></div>
         <pre id="internautenimage-debug" style="display:none;margin-top:10px;max-height:180px;overflow:auto;white-space:pre-wrap;background:#f7f7f9;border:1px solid #ddd;padding:8px;"></pre>
     </div>
 </div>
@@ -501,6 +514,7 @@ class InternautenImage extends Module
     var bar  = document.getElementById(\'internautenimage-progress-bar\');
     var txt  = document.getElementById(\'internautenimage-progress-text\');
     var res  = document.getElementById(\'internautenimage-result\');
+    var det  = document.getElementById(\'internautenimage-details\');
     var dbg  = document.getElementById(\'internautenimage-debug\');
     var icon = document.getElementById(\'internautenimage-progress-icon\');
     var uploadPhaseDone = false;
@@ -550,6 +564,10 @@ class InternautenImage extends Module
         setSpinnerActive(true, false);
         res.style.display  = \'none\';
         res.textContent    = \'\';
+        if (det) {
+            det.style.display = \'none\';
+            det.innerHTML = \'\';
+        }
         if (dbg) {
             dbg.style.display = \'none\';
             dbg.textContent = \'\';
@@ -629,6 +647,11 @@ class InternautenImage extends Module
                         bar.classList.add(\'progress-bar-success\');
                         res.className   = \'alert alert-success\';
                         res.textContent = ' . $lDone . ' + \' \' + r.imported + \' \' + ' . $lImported . ' + \' \' + r.skipped + \' \' + ' . $lSkipped . ';
+                        if (det && r.details_html) {
+                            det.className = \'alert alert-warning\';
+                            det.innerHTML = r.details_html;
+                            det.style.display = \'block\';
+                        }
                     } else {
                         res.className   = \'alert alert-danger\';
                         res.textContent = ' . $lFailed . ' + \' \' + r.error;
@@ -1038,12 +1061,12 @@ class InternautenImage extends Module
         return (int) $value;
     }
 
-    protected function importArchive($shopScope, $productFilter, $progressKey = '', $importMode = 'add')
+    protected function importArchive($shopScope, $productFilter, $progressKey = '', $importMode = 'replace')
     {
         @set_time_limit(0);
         @ignore_user_abort(true);
 
-        $importMode = in_array($importMode, ['replace', 'skip', 'add'], true) ? $importMode : 'add';
+        $importMode = in_array($importMode, ['replace', 'skip', 'add'], true) ? $importMode : 'replace';
         if (!isset($_FILES['INTERN_AUTENIMAGE_IMPORT_ZIP'])) {
             if ($this->isPostTooLarge()) {
                 throw new Exception($this->getUploadLimitMessage());
@@ -1103,6 +1126,10 @@ class InternautenImage extends Module
         $processedFiles = 0;
         $this->updateProgress($progressKey, 0, $progressTotalUnits);
 
+        $imported = 0;
+        $skipped = 0;
+        $details = [];
+
         $grouped = [];
         foreach ($files as $filePath) {
             $filename = basename($filePath);
@@ -1110,6 +1137,13 @@ class InternautenImage extends Module
 
             $reference = $this->resolveReferenceForImport($info['baseReference'], $info['index'], $shopScope, $productFilter);
             if ($reference === null || $reference === '') {
+                $skipped++;
+                $details[] = [
+                    'file' => $filename,
+                    'reference' => (string) $info['baseReference'],
+                    'reason' => 'reference_not_found',
+                ];
+                $processedFiles++;
                 continue;
             }
 
@@ -1128,14 +1162,18 @@ class InternautenImage extends Module
             }
         }
 
-        $imported = 0;
-        $skipped = 0;
-
         foreach ($grouped as $reference => $items) {
             $productId = $this->findProductIdByReference($reference, $shopScope, $productFilter);
             if ($productId <= 0) {
                 $skipped += count($items);
                 $processedFiles += count($items);
+                foreach ($items as $item) {
+                    $details[] = [
+                        'file' => basename((string) $item['path']),
+                        'reference' => (string) $reference,
+                        'reason' => 'product_not_found',
+                    ];
+                }
                 $this->updateProgress($progressKey, min($progressTotalUnits, $totalFiles + $processedFiles), $progressTotalUnits);
                 continue;
             }
@@ -1145,6 +1183,13 @@ class InternautenImage extends Module
             if ($importMode === 'skip' && $hasExistingImages) {
                 $skipped += count($items);
                 $processedFiles += count($items);
+                foreach ($items as $item) {
+                    $details[] = [
+                        'file' => basename((string) $item['path']),
+                        'reference' => (string) $reference,
+                        'reason' => 'existing_images',
+                    ];
+                }
                 $this->updateProgress($progressKey, min($progressTotalUnits, $totalFiles + $processedFiles), $progressTotalUnits);
                 continue;
             }
@@ -1166,6 +1211,13 @@ class InternautenImage extends Module
             if (!Validate::isLoadedObject($product)) {
                 $skipped += count($items);
                 $processedFiles += count($items);
+                foreach ($items as $item) {
+                    $details[] = [
+                        'file' => basename((string) $item['path']),
+                        'reference' => (string) $reference,
+                        'reason' => 'product_not_loaded',
+                    ];
+                }
                 $this->updateProgress($progressKey, min($progressTotalUnits, $totalFiles + $processedFiles), $progressTotalUnits);
                 continue;
             }
@@ -1176,6 +1228,11 @@ class InternautenImage extends Module
                     $nextPosition++;
                 } else {
                     $skipped++;
+                    $details[] = [
+                        'file' => basename((string) $item['path']),
+                        'reference' => (string) $reference,
+                        'reason' => 'processing_failed',
+                    ];
                 }
                 $processedFiles++;
                 if (($processedFiles % 3) === 0 || $processedFiles >= $totalFiles) {
@@ -1184,19 +1241,61 @@ class InternautenImage extends Module
             }
         }
 
-        $knownCount = 0;
-        foreach ($grouped as $groupItems) {
-            $knownCount += count($groupItems);
-        }
-        $skipped += max(0, $totalFiles - $knownCount);
-
         $this->updateProgress($progressKey, $progressTotalUnits, $progressTotalUnits);
         $this->removeDirectory($extractDir);
 
         return [
             'imported' => (int) $imported,
             'skipped' => (int) $skipped,
+            'details' => $details,
         ];
+    }
+
+    protected function buildImportDetailsHtml(array $details)
+    {
+        if (empty($details)) {
+            return '';
+        }
+
+        $limit = 50;
+        $visible = array_slice($details, 0, $limit);
+
+        $html = '<strong>' . $this->l('Skipped product image files:') . '</strong>';
+        $html .= '<ul style="margin-top:8px;">';
+
+        foreach ($visible as $entry) {
+            $file = isset($entry['file']) ? (string) $entry['file'] : '';
+            $reference = isset($entry['reference']) ? (string) $entry['reference'] : '';
+            $reasonKey = isset($entry['reason']) ? (string) $entry['reason'] : '';
+
+            if ($reasonKey === 'reference_not_found') {
+                $reason = $this->l('No product reference could be derived from the file name, or no product matches it in the selected scope.');
+            } elseif ($reasonKey === 'product_not_found') {
+                $reason = $this->l('No product with this reference exists in the selected shop scope and product filter.');
+            } elseif ($reasonKey === 'existing_images') {
+                $reason = $this->l('Product already has images and import mode "Skip products with existing images" is selected.');
+            } elseif ($reasonKey === 'product_not_loaded') {
+                $reason = $this->l('Product could not be loaded for the selected shop scope.');
+            } else {
+                $reason = $this->l('Image could not be processed (invalid, unreadable or unsupported image file).');
+            }
+
+            $html .= '<li><code>' . htmlspecialchars($file, ENT_QUOTES, 'UTF-8') . '</code>';
+            if ($reference !== '') {
+                $html .= ' (' . $this->l('Reference:') . ' <code>'
+                    . htmlspecialchars($reference, ENT_QUOTES, 'UTF-8') . '</code>)';
+            }
+            $html .= ': ' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8') . '</li>';
+        }
+
+        $html .= '</ul>';
+
+        if (count($details) > $limit) {
+            $remaining = count($details) - $limit;
+            $html .= '<p>' . sprintf($this->l('... and %d more skipped files.'), (int) $remaining) . '</p>';
+        }
+
+        return $html;
     }
 
     protected function importCategoryArchive($shopScope)

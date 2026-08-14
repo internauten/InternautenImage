@@ -50,3 +50,11 @@ $_MODULE['<{internautenimage}prestashop>internautenimage_3a146b09feda81ffa14281f
 $_MODULE['<{internautenimage}prestashop>internautenimage_e24a8ee5d2adf23bb6296f62b2ccb357'] = 'Scope preview';
 $_MODULE['<{internautenimage}prestashop>internautenimage_952cabfc0dc5adc940d7ec7eb39bb96e'] = 'Change shop scope and product filter without starting export/import.';
 $_MODULE['<{internautenimage}prestashop>internautenimage_3e6719e42d67ebc5b675b21aa7845d9c'] = 'Apply selection';
+$_MODULE['<{internautenimage}prestashop>internautenimage_a06d253a6b22e05473b1a85d32bc862a'] = 'Skipped product image files:';
+$_MODULE['<{internautenimage}prestashop>internautenimage_b2f040dbcab35754be5c22e04621711c'] = 'No product reference could be derived from the file name, or no product matches it in the selected scope.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_0e35e9d2ad311c8ccf28e501581b14c7'] = 'No product with this reference exists in the selected shop scope and product filter.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_9cd56c71e01230b523a200cfc12271ea'] = 'Product already has images and import mode "Skip products with existing images" is selected.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_03548df7629234c6fbab05a2f5c085a7'] = 'Product could not be loaded for the selected shop scope.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_d454486af72aa5311a52ee48a1ac4a1d'] = 'Image could not be processed (invalid, unreadable or unsupported image file).';
+$_MODULE['<{internautenimage}prestashop>internautenimage_3dd42bfc8345e82c43b4a40a3426ec49'] = 'Reference:';
+$_MODULE['<{internautenimage}prestashop>internautenimage_2fcb986516442b6017ad2e6d83523821'] = '... and %d more skipped files.';

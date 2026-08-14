@@ -103,7 +103,7 @@ The workflow then builds and uploads:
 
 ```bash
 cd scripts
-./push-tag-from-module-version.sh
+./tag-release.sh
 ```
 
 ## Test nach Neustart

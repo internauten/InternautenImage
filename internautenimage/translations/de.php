@@ -61,3 +61,11 @@ $_MODULE['<{internautenimage}prestashop>internautenimage_3a146b09feda81ffa14281f
 $_MODULE['<{internautenimage}prestashop>internautenimage_e24a8ee5d2adf23bb6296f62b2ccb357'] = 'Vorschau-Filter';
 $_MODULE['<{internautenimage}prestashop>internautenimage_952cabfc0dc5adc940d7ec7eb39bb96e'] = 'Shop-Kontext und Produktfilter aendern, ohne Export/Import zu starten.';
 $_MODULE['<{internautenimage}prestashop>internautenimage_3e6719e42d67ebc5b675b21aa7845d9c'] = 'Auswahl anwenden';
+$_MODULE['<{internautenimage}prestashop>internautenimage_a06d253a6b22e05473b1a85d32bc862a'] = 'Nicht importierte Produktbilder:';
+$_MODULE['<{internautenimage}prestashop>internautenimage_b2f040dbcab35754be5c22e04621711c'] = 'Aus dem Dateinamen konnte keine Produktreferenz abgeleitet werden, oder kein Produkt im gewaehlten Bereich passt dazu.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_0e35e9d2ad311c8ccf28e501581b14c7'] = 'Es existiert kein Produkt mit dieser Referenz im gewaehlten Shop-Kontext und Produktfilter.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_9cd56c71e01230b523a200cfc12271ea'] = 'Produkt hat bereits Bilder und der Import-Modus "Produkte mit bestehenden Bildern ueberspringen" ist aktiv.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_03548df7629234c6fbab05a2f5c085a7'] = 'Produkt konnte im gewaehlten Shop-Kontext nicht geladen werden.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_d454486af72aa5311a52ee48a1ac4a1d'] = 'Bild konnte nicht verarbeitet werden (ungueltige, nicht lesbare oder nicht unterstuetzte Bilddatei).';
+$_MODULE['<{internautenimage}prestashop>internautenimage_3dd42bfc8345e82c43b4a40a3426ec49'] = 'Referenz:';
+$_MODULE['<{internautenimage}prestashop>internautenimage_2fcb986516442b6017ad2e6d83523821'] = '... und %d weitere uebersprungene Dateien.';
