@@ -106,6 +106,27 @@ cd scripts
 ./tag-release.sh
 ```
 
+## Neue Funktion Transfer to Marken
+
+Neuer Bereich „Kategoriebilder zu Marken kopieren" ist eingebaut (Modul v1.2.0).
+
+Funktionsweise in `internautenimage.php`:
+
+- `copyCategoryImagesToManufacturers()` holt alle Kategorien mit vorhandener Bilddatei und alle Marken im gewählten Shop-Kontext, normalisiert beide Namen (kleinschreiben, Umlaute/Akzente auflösen, Leer- und Sonderzeichen entfernen) und vergleicht sie.
+- `copyImageToManufacturer()` schreibt via `ImageManager::resize()` nach `_PS_MANU_IMG_DIR_` und erzeugt zusätzlich alle Thumbnails aus `ImageType::getImagesTypes('manufacturers')` – ein Regenerieren entfällt.
+- `renderCategoryToManufacturerForm()` liefert das Formular mit Shop-Kontext, Zuordnungsmodus (exakt / enthält), Schalter zum Überschreiben bestehender Markenbilder und Vorschau-Modus (standardmässig an).
+- `buildManufacturerCopyDetailsHtml()` zeigt pro Kategorie das Ergebnis mit Grund an.
+
+Sicherheitsnetze beim Matching:
+
+- Mehrdeutige Treffer (mehrere Marken passen) werden übersprungen statt willkürlich zugeordnet.
+- Eine Marke bekommt nur ein Bild; weitere Kategorien mit demselben Ziel werden als übersprungen gemeldet.
+- Bestehende Markenbilder bleiben erhalten, solange „Überschreiben" aus ist.
+
+Empfehlung: erst mit „Nur Vorschau = Ja" laufen lassen, Trefferliste prüfen, dann scharf schalten.
+
+Made changes.
+
 ## Weiteres/Zukünftiges
 
 Frage: muss nach dem bild upload die "Wiederherstellen der Vorschaubilder" ausgeführt werden?

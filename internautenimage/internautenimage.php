@@ -9,7 +9,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '1.1.4';
+        $this->version = '1.2.0';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -159,6 +159,30 @@ class InternautenImage extends Module
             }
         }
 
+        if (Tools::isSubmit('submitInternautenCategoryToManufacturer')) {
+            try {
+                $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_MANU_SHOP_SCOPE', 'current');
+                $matchMode = (string) Tools::getValue('INTERN_AUTENIMAGE_MANU_MATCH_MODE', 'exact');
+                $overwrite = (bool) Tools::getValue('INTERN_AUTENIMAGE_MANU_OVERWRITE', 0);
+                $dryRun = (bool) Tools::getValue('INTERN_AUTENIMAGE_MANU_DRY_RUN', 0);
+                $result = $this->copyCategoryImagesToManufacturers($shopScope, $matchMode, $overwrite, $dryRun);
+
+                $message = $dryRun
+                    ? $this->l('Preview finished. %1$d category images would be copied, %2$d categories skipped.')
+                    : $this->l('Copy finished. %1$d category images copied to manufacturers, %2$d categories skipped.');
+
+                $html .= $this->displayConfirmation(
+                    sprintf($message, (int) $result['copied'], (int) $result['skipped'])
+                );
+
+                if (!empty($result['details']) && is_array($result['details'])) {
+                    $html .= $this->displayWarning($this->buildManufacturerCopyDetailsHtml($result['details']));
+                }
+            } catch (Exception $e) {
+                $html .= $this->displayError($this->l('Copying category images to manufacturers failed: ') . $e->getMessage());
+            }
+        }
+
         $html .= $this->displayInformation(
             $this->l('Export: Creates a ZIP with product images. Import: Accepts a ZIP, maps images by product reference, and sets image legends to the product name in all languages.')
         );
@@ -190,7 +214,8 @@ class InternautenImage extends Module
             . $this->renderExportForm()
             . $this->renderImportForm()
             . $this->renderCategoryExportForm()
-            . $this->renderCategoryImportForm();
+            . $this->renderCategoryImportForm()
+            . $this->renderCategoryToManufacturerForm();
     }
 
     protected function renderScopeSelectionForm($shopScope, $productFilter)
@@ -820,6 +845,109 @@ class InternautenImage extends Module
         $helper->token = Tools::getAdminTokenLite('AdminModules');
         $helper->fields_value = [
             'INTERN_AUTENIMAGE_CATEGORY_SHOP_SCOPE' => (string) Tools::getValue('INTERN_AUTENIMAGE_CATEGORY_SHOP_SCOPE', 'current'),
+        ];
+
+        return $helper->generateForm([$fieldsForm]);
+    }
+
+    protected function renderCategoryToManufacturerForm()
+    {
+        $shopScopeOptions = [
+            [
+                'id_option' => 'current',
+                'name' => $this->l('Current shop only'),
+            ],
+            [
+                'id_option' => 'all',
+                'name' => $this->l('All shops'),
+            ],
+        ];
+
+        $matchModeOptions = [
+            [
+                'id_option' => 'exact',
+                'name' => $this->l('Exact name match'),
+            ],
+            [
+                'id_option' => 'contains',
+                'name' => $this->l('Also match when one name contains the other'),
+            ],
+        ];
+
+        $fieldsForm = [
+            'form' => [
+                'legend' => [
+                    'title' => $this->l('Copy Category Images to Manufacturers'),
+                    'icon' => 'icon-copy',
+                ],
+                'input' => [
+                    [
+                        'type' => 'select',
+                        'label' => $this->l('Shop scope'),
+                        'name' => 'INTERN_AUTENIMAGE_MANU_SHOP_SCOPE',
+                        'required' => true,
+                        'options' => [
+                            'query' => $shopScopeOptions,
+                            'id' => 'id_option',
+                            'name' => 'name',
+                        ],
+                    ],
+                    [
+                        'type' => 'select',
+                        'label' => $this->l('Matching mode'),
+                        'name' => 'INTERN_AUTENIMAGE_MANU_MATCH_MODE',
+                        'required' => true,
+                        'options' => [
+                            'query' => $matchModeOptions,
+                            'id' => 'id_option',
+                            'name' => 'name',
+                        ],
+                        'desc' => $this->l('Names are compared case-insensitively, ignoring spaces, punctuation and umlauts.'),
+                    ],
+                    [
+                        'type' => 'switch',
+                        'label' => $this->l('Overwrite existing manufacturer images'),
+                        'name' => 'INTERN_AUTENIMAGE_MANU_OVERWRITE',
+                        'is_bool' => true,
+                        'values' => [
+                            ['id' => 'manu_overwrite_on', 'value' => 1, 'label' => $this->l('Yes')],
+                            ['id' => 'manu_overwrite_off', 'value' => 0, 'label' => $this->l('No')],
+                        ],
+                    ],
+                    [
+                        'type' => 'switch',
+                        'label' => $this->l('Preview only'),
+                        'name' => 'INTERN_AUTENIMAGE_MANU_DRY_RUN',
+                        'is_bool' => true,
+                        'values' => [
+                            ['id' => 'manu_dry_run_on', 'value' => 1, 'label' => $this->l('Yes')],
+                            ['id' => 'manu_dry_run_off', 'value' => 0, 'label' => $this->l('No')],
+                        ],
+                        'desc' => $this->l('Shows the matches without writing any image files.'),
+                    ],
+                ],
+                'description' => $this->l('Each category with an image is matched against manufacturer names. On a unique match the category image is copied to the manufacturer, including all manufacturer thumbnails.'),
+                'submit' => [
+                    'title' => $this->l('Copy category images to manufacturers'),
+                    'class' => 'btn btn-default pull-right',
+                    'name' => 'submitInternautenCategoryToManufacturer',
+                ],
+            ],
+        ];
+
+        $helper = new HelperForm();
+        $helper->show_toolbar = false;
+        $helper->table = $this->table;
+        $helper->module = $this;
+        $helper->identifier = $this->identifier;
+        $helper->submit_action = 'submitInternautenCategoryToManufacturer';
+        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->fields_value = [
+            'INTERN_AUTENIMAGE_MANU_SHOP_SCOPE' => (string) Tools::getValue('INTERN_AUTENIMAGE_MANU_SHOP_SCOPE', 'current'),
+            'INTERN_AUTENIMAGE_MANU_MATCH_MODE' => (string) Tools::getValue('INTERN_AUTENIMAGE_MANU_MATCH_MODE', 'exact'),
+            'INTERN_AUTENIMAGE_MANU_OVERWRITE' => (int) Tools::getValue('INTERN_AUTENIMAGE_MANU_OVERWRITE', 0),
+            'INTERN_AUTENIMAGE_MANU_DRY_RUN' => (int) Tools::getValue('INTERN_AUTENIMAGE_MANU_DRY_RUN', 1),
         ];
 
         return $helper->generateForm([$fieldsForm]);
@@ -1634,6 +1762,328 @@ class InternautenImage extends Module
         }
 
         return _PS_CAT_IMG_DIR_ . (int) $categoryId . '.jpg';
+    }
+
+    protected function copyCategoryImagesToManufacturers($shopScope, $matchMode = 'exact', $overwrite = false, $dryRun = false)
+    {
+        @set_time_limit(0);
+
+        $shopScope = $shopScope === 'all' ? 'all' : 'current';
+        $matchMode = in_array($matchMode, ['exact', 'contains'], true) ? $matchMode : 'exact';
+
+        $manufacturers = $this->getManufacturersForScope($shopScope);
+        if (empty($manufacturers)) {
+            throw new Exception($this->l('No manufacturers found in the selected shop scope.'));
+        }
+
+        $manufacturerIndex = [];
+        foreach ($manufacturers as $manufacturer) {
+            $key = $this->normalizeNameForMatching((string) $manufacturer['name']);
+            if ($key === '') {
+                continue;
+            }
+            if (!isset($manufacturerIndex[$key])) {
+                $manufacturerIndex[$key] = [];
+            }
+            $manufacturerIndex[$key][] = $manufacturer;
+        }
+
+        $categories = $this->getCategoriesWithImageForScope($shopScope);
+        if (empty($categories)) {
+            throw new Exception($this->l('No categories with an image found in the selected shop scope.'));
+        }
+
+        $copied = 0;
+        $skipped = 0;
+        $details = [];
+        $usedManufacturerIds = [];
+
+        foreach ($categories as $category) {
+            $categoryId = (int) $category['id_category'];
+            $categoryName = (string) $category['name'];
+            $normalized = $this->normalizeNameForMatching($categoryName);
+
+            if ($normalized === '') {
+                $skipped++;
+                $details[] = [
+                    'category' => $categoryName . ' (#' . $categoryId . ')',
+                    'reason' => 'no_match',
+                ];
+                continue;
+            }
+
+            $matches = isset($manufacturerIndex[$normalized]) ? $manufacturerIndex[$normalized] : [];
+
+            if (empty($matches) && $matchMode === 'contains') {
+                foreach ($manufacturerIndex as $key => $entries) {
+                    if (strpos($normalized, $key) !== false || strpos($key, $normalized) !== false) {
+                        $matches = array_merge($matches, $entries);
+                    }
+                }
+            }
+
+            if (empty($matches)) {
+                $skipped++;
+                $details[] = [
+                    'category' => $categoryName . ' (#' . $categoryId . ')',
+                    'reason' => 'no_match',
+                ];
+                continue;
+            }
+
+            if (count($matches) > 1) {
+                $names = [];
+                foreach ($matches as $entry) {
+                    $names[] = (string) $entry['name'] . ' (#' . (int) $entry['id_manufacturer'] . ')';
+                }
+                $skipped++;
+                $details[] = [
+                    'category' => $categoryName . ' (#' . $categoryId . ')',
+                    'manufacturer' => implode(', ', $names),
+                    'reason' => 'ambiguous_match',
+                ];
+                continue;
+            }
+
+            $manufacturerId = (int) $matches[0]['id_manufacturer'];
+            $manufacturerName = (string) $matches[0]['name'];
+            $manufacturerLabel = $manufacturerName . ' (#' . $manufacturerId . ')';
+
+            if (isset($usedManufacturerIds[$manufacturerId])) {
+                $skipped++;
+                $details[] = [
+                    'category' => $categoryName . ' (#' . $categoryId . ')',
+                    'manufacturer' => $manufacturerLabel,
+                    'reason' => 'manufacturer_already_used',
+                ];
+                continue;
+            }
+
+            $sourcePath = $this->getCategoryImageSourcePath($categoryId);
+            if (!is_file($sourcePath)) {
+                $skipped++;
+                $details[] = [
+                    'category' => $categoryName . ' (#' . $categoryId . ')',
+                    'manufacturer' => $manufacturerLabel,
+                    'reason' => 'source_missing',
+                ];
+                continue;
+            }
+
+            $targetPath = _PS_MANU_IMG_DIR_ . $manufacturerId . '.jpg';
+            if (!$overwrite && is_file($targetPath)) {
+                $skipped++;
+                $details[] = [
+                    'category' => $categoryName . ' (#' . $categoryId . ')',
+                    'manufacturer' => $manufacturerLabel,
+                    'reason' => 'existing_image',
+                ];
+                continue;
+            }
+
+            if ($dryRun) {
+                $copied++;
+                $usedManufacturerIds[$manufacturerId] = true;
+                $details[] = [
+                    'category' => $categoryName . ' (#' . $categoryId . ')',
+                    'manufacturer' => $manufacturerLabel,
+                    'reason' => 'preview_match',
+                ];
+                continue;
+            }
+
+            if (!$this->copyImageToManufacturer($manufacturerId, $sourcePath)) {
+                $skipped++;
+                $details[] = [
+                    'category' => $categoryName . ' (#' . $categoryId . ')',
+                    'manufacturer' => $manufacturerLabel,
+                    'reason' => 'processing_failed',
+                ];
+                continue;
+            }
+
+            $copied++;
+            $usedManufacturerIds[$manufacturerId] = true;
+        }
+
+        return [
+            'copied' => (int) $copied,
+            'skipped' => (int) $skipped,
+            'details' => $details,
+        ];
+    }
+
+    protected function copyImageToManufacturer($manufacturerId, $sourcePath)
+    {
+        $manufacturerId = (int) $manufacturerId;
+        if ($manufacturerId <= 0 || !is_file($sourcePath)) {
+            return false;
+        }
+
+        $targetPath = _PS_MANU_IMG_DIR_ . $manufacturerId . '.jpg';
+        if (!ImageManager::resize($sourcePath, $targetPath)) {
+            return false;
+        }
+
+        $types = ImageType::getImagesTypes('manufacturers');
+        foreach ($types as $type) {
+            $thumbPath = _PS_MANU_IMG_DIR_ . $manufacturerId . '-' . stripslashes((string) $type['name']) . '.jpg';
+            ImageManager::resize(
+                $targetPath,
+                $thumbPath,
+                (int) $type['width'],
+                (int) $type['height']
+            );
+        }
+
+        return true;
+    }
+
+    protected function getManufacturersForScope($shopScope)
+    {
+        $db = Db::getInstance();
+        $shopScope = $shopScope === 'all' ? 'all' : 'current';
+
+        $sql = 'SELECT m.id_manufacturer, m.name FROM ' . _DB_PREFIX_ . 'manufacturer m';
+
+        if (Shop::isFeatureActive() && $shopScope === 'current') {
+            $sql .= ' INNER JOIN ' . _DB_PREFIX_ . 'manufacturer_shop ms ON ms.id_manufacturer = m.id_manufacturer'
+                . ' AND ms.id_shop = ' . (int) $this->context->shop->id;
+        }
+
+        $sql .= ' GROUP BY m.id_manufacturer ORDER BY m.id_manufacturer ASC';
+
+        $rows = $db->executeS($sql);
+        if ($rows === false) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($rows as $row) {
+            $id = (int) $row['id_manufacturer'];
+            if ($id > 0) {
+                $result[] = [
+                    'id_manufacturer' => $id,
+                    'name' => (string) $row['name'],
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    protected function getCategoriesWithImageForScope($shopScope)
+    {
+        $langId = (int) $this->context->language->id;
+        $categoryIds = $this->getCategoryIdsForScope($shopScope);
+        if (empty($categoryIds)) {
+            return [];
+        }
+
+        $rows = Db::getInstance()->executeS(
+            'SELECT cl.id_category, cl.name FROM ' . _DB_PREFIX_ . 'category_lang cl '
+            . 'WHERE cl.id_lang = ' . $langId
+            . ' AND cl.id_category IN (' . implode(',', array_map('intval', $categoryIds)) . ') '
+            . 'GROUP BY cl.id_category ORDER BY cl.id_category ASC'
+        );
+
+        if ($rows === false) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($rows as $row) {
+            $id = (int) $row['id_category'];
+            if ($id <= 0 || !is_file($this->getCategoryImageSourcePath($id))) {
+                continue;
+            }
+
+            $result[] = [
+                'id_category' => $id,
+                'name' => (string) $row['name'],
+            ];
+        }
+
+        return $result;
+    }
+
+    protected function normalizeNameForMatching($name)
+    {
+        $name = trim((string) $name);
+        if ($name === '') {
+            return '';
+        }
+
+        if (function_exists('mb_strtolower')) {
+            $name = mb_strtolower($name, 'UTF-8');
+        } else {
+            $name = strtolower($name);
+        }
+
+        $replacements = [
+            'ä' => 'ae', 'ö' => 'oe', 'ü' => 'ue', 'ß' => 'ss',
+            'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'å' => 'a',
+            'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ù' => 'u', 'ú' => 'u', 'û' => 'u',
+            'ç' => 'c', 'ñ' => 'n',
+        ];
+        $name = strtr($name, $replacements);
+
+        $name = preg_replace('/[^a-z0-9]+/', '', $name);
+
+        return (string) $name;
+    }
+
+    protected function buildManufacturerCopyDetailsHtml(array $details)
+    {
+        if (empty($details)) {
+            return '';
+        }
+
+        $limit = 50;
+        $visible = array_slice($details, 0, $limit);
+
+        $html = '<strong>' . $this->l('Category to manufacturer matching results:') . '</strong>';
+        $html .= '<ul style="margin-top:8px;">';
+
+        foreach ($visible as $entry) {
+            $category = isset($entry['category']) ? (string) $entry['category'] : '';
+            $manufacturer = isset($entry['manufacturer']) ? (string) $entry['manufacturer'] : '';
+            $reasonKey = isset($entry['reason']) ? (string) $entry['reason'] : '';
+
+            if ($reasonKey === 'no_match') {
+                $reason = $this->l('No manufacturer matches this category name.');
+            } elseif ($reasonKey === 'ambiguous_match') {
+                $reason = $this->l('Several manufacturers match this category name, so no image was copied.');
+            } elseif ($reasonKey === 'manufacturer_already_used') {
+                $reason = $this->l('Manufacturer already received an image from another category.');
+            } elseif ($reasonKey === 'source_missing') {
+                $reason = $this->l('Category image file is missing on the server.');
+            } elseif ($reasonKey === 'existing_image') {
+                $reason = $this->l('Manufacturer already has an image and overwriting is disabled.');
+            } elseif ($reasonKey === 'preview_match') {
+                $reason = $this->l('Would be copied (preview only, nothing was written).');
+            } else {
+                $reason = $this->l('Image could not be processed.');
+            }
+
+            $html .= '<li><code>' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8') . '</code>';
+            if ($manufacturer !== '') {
+                $html .= ' &rarr; <code>' . htmlspecialchars($manufacturer, ENT_QUOTES, 'UTF-8') . '</code>';
+            }
+            $html .= ': ' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8') . '</li>';
+        }
+
+        $html .= '</ul>';
+
+        if (count($details) > $limit) {
+            $remaining = count($details) - $limit;
+            $html .= '<p>' . sprintf($this->l('... and %d more entries.'), (int) $remaining) . '</p>';
+        }
+
+        return $html;
     }
 
     protected function parseCategoryImageFromFilename($filename)
