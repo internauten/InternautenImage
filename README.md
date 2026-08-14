@@ -88,7 +88,7 @@ GitHub Releases are created automatically when you push a tag in this format:
 
 - vX.X.X (example: v1.1.2)
 
-Create and push a release tag:
+Create and push a release tag manualy:
 
 ```bash
 git tag v1.1.2
@@ -105,6 +105,8 @@ The workflow then builds and uploads:
 cd scripts
 ./tag-release.sh
 ```
+
+Reads Version from internautenimage.php, prevents taging if not all files are Published.
 
 ## Neue Funktion Transfer to Marken
 
@@ -146,7 +148,7 @@ Wenn dein Shop auf WebP/AVIF läuft, kann ich den Import so erweitern, dass er d
 
 ## Develope
 
-Verfahren wie in [`WoWGetPrestaLocal`](https://github.com/internauten/WoWGetPrestaLocal).
+Verfahren wie in [`WoWGetPrestaLocal`](https://github.com/internauten/WoWGetPrestaLocal) dokumentiert.
 
 ## License
 
