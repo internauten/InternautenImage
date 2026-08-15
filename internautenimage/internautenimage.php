@@ -9,7 +9,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '1.2.0';
+        $this->version = '1.2.1';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -1350,10 +1350,12 @@ class InternautenImage extends Module
                 continue;
             }
 
+            $isFirstForProduct = !$hasExistingImages;
             foreach ($items as $item) {
-                if ($this->importSingleProductImage($product, (string) $item['path'], $nextPosition)) {
+                if ($this->importSingleProductImage($product, (string) $item['path'], $nextPosition, $isFirstForProduct)) {
                     $imported++;
                     $nextPosition++;
+                    $isFirstForProduct = false;
                 } else {
                     $skipped++;
                     $details[] = [
@@ -2157,13 +2159,11 @@ class InternautenImage extends Module
         return true;
     }
 
-    protected function importSingleProductImage(Product $product, $sourcePath, $position)
+    protected function importSingleProductImage(Product $product, $sourcePath, $position, $isFirstForProduct)
     {
         if (!is_file($sourcePath)) {
             return false;
         }
-
-        $isFirstForProduct = ((int) $this->getNextImagePosition((int) $product->id) === 0);
 
         $image = new Image();
         $image->id_product = (int) $product->id;
