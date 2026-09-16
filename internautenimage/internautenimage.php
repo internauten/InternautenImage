@@ -5,11 +5,14 @@ if (!defined('_PS_VERSION_')) {
 
 class InternautenImage extends Module
 {
+    const MANUFACTURER_NAME_IMAGE_WIDTH = 200;
+    const MANUFACTURER_NAME_IMAGE_HEIGHT = 150;
+
     public function __construct()
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '1.2.1';
+        $this->version = '1.3.0';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -159,6 +162,29 @@ class InternautenImage extends Module
             }
         }
 
+        if (Tools::isSubmit('submitInternautenManufacturerNameImage')) {
+            try {
+                $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_MANU_GEN_SHOP_SCOPE', 'current');
+                $overwrite = (bool) Tools::getValue('INTERN_AUTENIMAGE_MANU_GEN_OVERWRITE', 0);
+                $dryRun = (bool) Tools::getValue('INTERN_AUTENIMAGE_MANU_GEN_DRY_RUN', 0);
+                $result = $this->generateManufacturerNameImages($shopScope, $overwrite, $dryRun);
+
+                $message = $dryRun
+                    ? $this->l('Generation preview finished. %1$d manufacturer images would be generated, %2$d manufacturers skipped.')
+                    : $this->l('Generation finished. %1$d manufacturer images generated, %2$d manufacturers skipped.');
+
+                $html .= $this->displayConfirmation(
+                    sprintf($message, (int) $result['generated'], (int) $result['skipped'])
+                );
+
+                if (!empty($result['details']) && is_array($result['details'])) {
+                    $html .= $this->displayWarning($this->buildManufacturerNameImageDetailsHtml($result['details']));
+                }
+            } catch (Exception $e) {
+                $html .= $this->displayError($this->l('Generating manufacturer images failed: ') . $e->getMessage());
+            }
+        }
+
         if (Tools::isSubmit('submitInternautenCategoryToManufacturer')) {
             try {
                 $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_MANU_SHOP_SCOPE', 'current');
@@ -209,13 +235,22 @@ class InternautenImage extends Module
             )
         );
 
+        $html .= $this->displayInformation(
+            sprintf(
+                $this->l('Manufacturers without images: %1$d (Shop scope: %2$s)'),
+                (int) $this->getManufacturersWithoutImageCount($shopScopeForInfo),
+                (string) $shopScopeLabel
+            )
+        );
+
         return $html
             . $this->renderScopeSelectionForm($shopScopeForInfo, $productFilterForInfo)
             . $this->renderExportForm()
             . $this->renderImportForm()
             . $this->renderCategoryExportForm()
             . $this->renderCategoryImportForm()
-            . $this->renderCategoryToManufacturerForm();
+            . $this->renderCategoryToManufacturerForm()
+            . $this->renderManufacturerNameImageForm();
     }
 
     protected function renderScopeSelectionForm($shopScope, $productFilter)
@@ -953,6 +988,89 @@ class InternautenImage extends Module
         return $helper->generateForm([$fieldsForm]);
     }
 
+    protected function renderManufacturerNameImageForm()
+    {
+        $shopScopeOptions = [
+            [
+                'id_option' => 'current',
+                'name' => $this->l('Current shop only'),
+            ],
+            [
+                'id_option' => 'all',
+                'name' => $this->l('All shops'),
+            ],
+        ];
+
+        $fieldsForm = [
+            'form' => [
+                'legend' => [
+                    'title' => $this->l('Generate Name Images for Manufacturers without Image'),
+                    'icon' => 'icon-font',
+                ],
+                'input' => [
+                    [
+                        'type' => 'select',
+                        'label' => $this->l('Shop scope'),
+                        'name' => 'INTERN_AUTENIMAGE_MANU_GEN_SHOP_SCOPE',
+                        'required' => true,
+                        'options' => [
+                            'query' => $shopScopeOptions,
+                            'id' => 'id_option',
+                            'name' => 'name',
+                        ],
+                    ],
+                    [
+                        'type' => 'switch',
+                        'label' => $this->l('Overwrite existing manufacturer images'),
+                        'name' => 'INTERN_AUTENIMAGE_MANU_GEN_OVERWRITE',
+                        'is_bool' => true,
+                        'values' => [
+                            ['id' => 'manu_gen_overwrite_on', 'value' => 1, 'label' => $this->l('Yes')],
+                            ['id' => 'manu_gen_overwrite_off', 'value' => 0, 'label' => $this->l('No')],
+                        ],
+                    ],
+                    [
+                        'type' => 'switch',
+                        'label' => $this->l('Preview only'),
+                        'name' => 'INTERN_AUTENIMAGE_MANU_GEN_DRY_RUN',
+                        'is_bool' => true,
+                        'values' => [
+                            ['id' => 'manu_gen_dry_run_on', 'value' => 1, 'label' => $this->l('Yes')],
+                            ['id' => 'manu_gen_dry_run_off', 'value' => 0, 'label' => $this->l('No')],
+                        ],
+                        'desc' => $this->l('Shows the manufacturers without writing any image files.'),
+                    ],
+                ],
+                'description' => sprintf(
+                    $this->l('For every manufacturer without an image a %1$dx%2$d pixel JPG containing the manufacturer name is generated, including all manufacturer thumbnails.'),
+                    (int) self::MANUFACTURER_NAME_IMAGE_WIDTH,
+                    (int) self::MANUFACTURER_NAME_IMAGE_HEIGHT
+                ),
+                'submit' => [
+                    'title' => $this->l('Generate name images'),
+                    'class' => 'btn btn-default pull-right',
+                    'name' => 'submitInternautenManufacturerNameImage',
+                ],
+            ],
+        ];
+
+        $helper = new HelperForm();
+        $helper->show_toolbar = false;
+        $helper->table = $this->table;
+        $helper->module = $this;
+        $helper->identifier = $this->identifier;
+        $helper->submit_action = 'submitInternautenManufacturerNameImage';
+        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->fields_value = [
+            'INTERN_AUTENIMAGE_MANU_GEN_SHOP_SCOPE' => (string) Tools::getValue('INTERN_AUTENIMAGE_MANU_GEN_SHOP_SCOPE', 'current'),
+            'INTERN_AUTENIMAGE_MANU_GEN_OVERWRITE' => (int) Tools::getValue('INTERN_AUTENIMAGE_MANU_GEN_OVERWRITE', 0),
+            'INTERN_AUTENIMAGE_MANU_GEN_DRY_RUN' => (int) Tools::getValue('INTERN_AUTENIMAGE_MANU_GEN_DRY_RUN', 1),
+        ];
+
+        return $helper->generateForm([$fieldsForm]);
+    }
+
     protected function buildArchive($langId, $shopScope, $productFilter)
     {
         @set_time_limit(0);
@@ -1187,6 +1305,20 @@ class InternautenImage extends Module
         }
 
         return (int) $value;
+    }
+
+    protected function getManufacturersWithoutImageCount($shopScope)
+    {
+        $manufacturers = $this->getManufacturersForScope($shopScope);
+        $count = 0;
+
+        foreach ($manufacturers as $manufacturer) {
+            if (!is_file(_PS_MANU_IMG_DIR_ . (int) $manufacturer['id_manufacturer'] . '.jpg')) {
+                $count++;
+            }
+        }
+
+        return (int) $count;
     }
 
     protected function importArchive($shopScope, $productFilter, $progressKey = '', $importMode = 'replace')
@@ -1939,6 +2071,237 @@ class InternautenImage extends Module
         }
 
         return true;
+    }
+
+    protected function generateManufacturerNameImages($shopScope, $overwrite = false, $dryRun = false)
+    {
+        @set_time_limit(0);
+
+        $shopScope = $shopScope === 'all' ? 'all' : 'current';
+
+        if (!function_exists('imagecreatetruecolor') || !function_exists('imagejpeg')) {
+            throw new Exception($this->l('The PHP GD extension is required to generate manufacturer name images.'));
+        }
+
+        $manufacturers = $this->getManufacturersForScope($shopScope);
+        if (empty($manufacturers)) {
+            throw new Exception($this->l('No manufacturers found in the selected shop scope.'));
+        }
+
+        $generated = 0;
+        $skipped = 0;
+        $details = [];
+
+        foreach ($manufacturers as $manufacturer) {
+            $manufacturerId = (int) $manufacturer['id_manufacturer'];
+            $manufacturerName = trim((string) $manufacturer['name']);
+            $manufacturerLabel = $manufacturerName . ' (#' . $manufacturerId . ')';
+            $targetPath = _PS_MANU_IMG_DIR_ . $manufacturerId . '.jpg';
+
+            if ($manufacturerName === '') {
+                $skipped++;
+                $details[] = [
+                    'manufacturer' => $manufacturerLabel,
+                    'reason' => 'empty_name',
+                ];
+                continue;
+            }
+
+            if (is_file($targetPath) && !$overwrite) {
+                $skipped++;
+                $details[] = [
+                    'manufacturer' => $manufacturerLabel,
+                    'reason' => 'existing_image',
+                ];
+                continue;
+            }
+
+            if ($dryRun) {
+                $generated++;
+                $details[] = [
+                    'manufacturer' => $manufacturerLabel,
+                    'reason' => 'preview_generate',
+                ];
+                continue;
+            }
+
+            if (!$this->writeManufacturerNameImage($manufacturerId, $manufacturerName)) {
+                $skipped++;
+                $details[] = [
+                    'manufacturer' => $manufacturerLabel,
+                    'reason' => 'processing_failed',
+                ];
+                continue;
+            }
+
+            $generated++;
+            $details[] = [
+                'manufacturer' => $manufacturerLabel,
+                'reason' => 'generated',
+            ];
+        }
+
+        return [
+            'generated' => (int) $generated,
+            'skipped' => (int) $skipped,
+            'details' => $details,
+        ];
+    }
+
+    protected function writeManufacturerNameImage($manufacturerId, $manufacturerName)
+    {
+        $manufacturerId = (int) $manufacturerId;
+        if ($manufacturerId <= 0) {
+            return false;
+        }
+
+        $width = (int) self::MANUFACTURER_NAME_IMAGE_WIDTH;
+        $height = (int) self::MANUFACTURER_NAME_IMAGE_HEIGHT;
+
+        $image = imagecreatetruecolor($width, $height);
+        if ($image === false) {
+            return false;
+        }
+
+        $background = imagecolorallocate($image, 255, 255, 255);
+        $foreground = imagecolorallocate($image, 34, 34, 34);
+        imagefilledrectangle($image, 0, 0, $width - 1, $height - 1, $background);
+
+        $lines = $this->splitManufacturerNameIntoLines($manufacturerName, 16, 3);
+        $fontSize = 5;
+        $charWidth = imagefontwidth($fontSize);
+        $charHeight = imagefontheight($fontSize);
+        $lineSpacing = 6;
+        $blockHeight = (count($lines) * $charHeight) + ((count($lines) - 1) * $lineSpacing);
+        $y = (int) max(0, round(($height - $blockHeight) / 2));
+
+        foreach ($lines as $line) {
+            $x = (int) max(0, round(($width - (strlen($line) * $charWidth)) / 2));
+            imagestring($image, $fontSize, $x, $y, $line, $foreground);
+            $y += $charHeight + $lineSpacing;
+        }
+
+        $targetPath = _PS_MANU_IMG_DIR_ . $manufacturerId . '.jpg';
+        $written = imagejpeg($image, $targetPath, 90);
+        imagedestroy($image);
+
+        if (!$written) {
+            return false;
+        }
+
+        $types = ImageType::getImagesTypes('manufacturers');
+        foreach ($types as $type) {
+            $thumbPath = _PS_MANU_IMG_DIR_ . $manufacturerId . '-' . stripslashes((string) $type['name']) . '.jpg';
+            ImageManager::resize(
+                $targetPath,
+                $thumbPath,
+                (int) $type['width'],
+                (int) $type['height']
+            );
+        }
+
+        return true;
+    }
+
+    protected function splitManufacturerNameIntoLines($manufacturerName, $maxCharsPerLine, $maxLines)
+    {
+        $maxCharsPerLine = max(1, (int) $maxCharsPerLine);
+        $maxLines = max(1, (int) $maxLines);
+
+        // imagestring() only renders single-byte glyphs, so transliterate to ASCII first.
+        $text = trim((string) $manufacturerName);
+        if (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'ASCII//TRANSLIT', $text);
+            if ($converted !== false && $converted !== '') {
+                $text = $converted;
+            }
+        }
+        $text = (string) preg_replace('/[^\x20-\x7E]/', '', $text);
+        $text = trim((string) preg_replace('/\s+/', ' ', $text));
+
+        if ($text === '') {
+            return ['?'];
+        }
+
+        $lines = [];
+        $current = '';
+
+        foreach (explode(' ', $text) as $word) {
+            while (strlen($word) > $maxCharsPerLine) {
+                if ($current !== '') {
+                    $lines[] = $current;
+                    $current = '';
+                }
+                $lines[] = substr($word, 0, $maxCharsPerLine);
+                $word = substr($word, $maxCharsPerLine);
+            }
+
+            if ($current === '') {
+                $current = $word;
+            } elseif (strlen($current) + 1 + strlen($word) <= $maxCharsPerLine) {
+                $current .= ' ' . $word;
+            } else {
+                $lines[] = $current;
+                $current = $word;
+            }
+        }
+
+        if ($current !== '') {
+            $lines[] = $current;
+        }
+
+        if (count($lines) > $maxLines) {
+            $lines = array_slice($lines, 0, $maxLines);
+            $last = $lines[$maxLines - 1];
+            if (strlen($last) > $maxCharsPerLine - 3) {
+                $last = substr($last, 0, max(1, $maxCharsPerLine - 3));
+            }
+            $lines[$maxLines - 1] = $last . '...';
+        }
+
+        return $lines;
+    }
+
+    protected function buildManufacturerNameImageDetailsHtml(array $details)
+    {
+        if (empty($details)) {
+            return '';
+        }
+
+        $limit = 200;
+        $visible = array_slice($details, 0, $limit);
+
+        $html = '<strong>' . $this->l('Generated manufacturer name images:') . '</strong>';
+        $html .= '<ul style="margin-top:8px;">';
+
+        foreach ($visible as $entry) {
+            $manufacturer = isset($entry['manufacturer']) ? (string) $entry['manufacturer'] : '';
+            $reasonKey = isset($entry['reason']) ? (string) $entry['reason'] : '';
+
+            if ($reasonKey === 'generated') {
+                $reason = $this->l('Name image generated.');
+            } elseif ($reasonKey === 'preview_generate') {
+                $reason = $this->l('Would get a generated name image (preview only, nothing was written).');
+            } elseif ($reasonKey === 'existing_image') {
+                $reason = $this->l('Manufacturer already has an image and overwriting is disabled.');
+            } elseif ($reasonKey === 'empty_name') {
+                $reason = $this->l('Manufacturer has no usable name.');
+            } else {
+                $reason = $this->l('Image could not be processed.');
+            }
+
+            $html .= '<li><code>' . htmlspecialchars($manufacturer, ENT_QUOTES, 'UTF-8') . '</code>: '
+                . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8') . '</li>';
+        }
+
+        $html .= '</ul>';
+
+        if (count($details) > $limit) {
+            $remaining = count($details) - $limit;
+            $html .= '<p>' . sprintf($this->l('... and %d more entries.'), (int) $remaining) . '</p>';
+        }
+
+        return $html;
     }
 
     protected function getManufacturersForScope($shopScope)

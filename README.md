@@ -119,6 +119,21 @@ Funktionsweise in `internautenimage.php`:
 - `renderCategoryToManufacturerForm()` liefert das Formular mit Shop-Kontext, Zuordnungsmodus (exakt / enthält), Schalter zum Überschreiben bestehender Markenbilder und Vorschau-Modus (standardmässig an).
 - `buildManufacturerCopyDetailsHtml()` zeigt pro Kategorie das Ergebnis mit Grund an.
 
+## Neue Funktion Namensbilder für Marken ohne Bild
+
+Neuer Bereich „Namensbilder für Marken ohne Bild generieren" (Modul v1.3.0).
+
+Funktionsweise in `internautenimage.php`:
+
+- `generateManufacturerNameImages()` durchläuft alle Marken im gewählten Shop-Kontext und erzeugt für jede Marke ohne Bilddatei ein JPG mit dem Markennamen.
+- `writeManufacturerNameImage()` zeichnet den Namen per GD zentriert auf eine weisse Fläche von 200x150 Pixel, speichert nach `_PS_MANU_IMG_DIR_` und erzeugt alle Thumbnails aus `ImageType::getImagesTypes('manufacturers')`.
+- `splitManufacturerNameIntoLines()` transliteriert den Namen nach ASCII und bricht ihn auf maximal 3 Zeilen à 16 Zeichen um.
+- `renderManufacturerNameImageForm()` liefert das Formular mit Shop-Kontext, Schalter zum Überschreiben bestehender Markenbilder und Vorschau-Modus (standardmässig an).
+- `buildManufacturerNameImageDetailsHtml()` protokolliert im BO jede Marke mit Ergebnis und Grund (generiert, Vorschau, bestehendes Bild, kein Name, Fehler).
+- `getManufacturersWithoutImageCount()` zeigt oben auf der Konfigurationsseite die Anzahl Marken ohne Bild an.
+
+Voraussetzung: PHP-Erweiterung GD. Fehlt sie, bricht die Funktion mit einer Meldung ab.
+
 Sicherheitsnetze beim Matching:
 
 - Mehrdeutige Treffer (mehrere Marken passen) werden übersprungen statt willkürlich zugeordnet.
