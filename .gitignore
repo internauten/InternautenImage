@@ -1,3 +1,11 @@
+# Git ignore rules for the InternautenImage module repository.
+# Copyright (c) 2026 die.internauten.ch GmbH
+# License: MIT
+
+# PrestaShop-generated module config cache
+config.xml
+config_*.xml
+
 # OS / Editor
 .DS_Store
 Thumbs.db
