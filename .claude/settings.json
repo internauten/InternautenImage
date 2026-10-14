@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "php \"${CLAUDE_PROJECT_DIR:-.}/.github/hooks/scripts/php-lint.php\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "php .github/hooks/scripts/php-lint.php",
+        "timeout": 15
+      }
+    ]
+  }
+}
