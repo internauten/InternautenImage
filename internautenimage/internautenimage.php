@@ -12,7 +12,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '1.3.0';
+        $this->version = '2.0.0';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -21,7 +21,7 @@ class InternautenImage extends Module
 
         $this->displayName = $this->l('Internauten Product Image Export and Import');
         $this->description = $this->l('Exports product images as a ZIP directly from the PrestaShop configuration page and allows importing images from a ZIP.');
-        $this->ps_versions_compliancy = ['min' => '1.7.0.0', 'max' => _PS_VERSION_];
+        $this->ps_versions_compliancy = ['min' => '9.1.4', 'max' => _PS_VERSION_];
     }
 
     public function install()

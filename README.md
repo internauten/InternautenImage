@@ -16,6 +16,13 @@ This project contains an installable PrestaShop module that exports product imag
 
 - find it under releses
 
+## Requirements
+
+- PrestaShop **9.1.4** or newer (PHP 8.1+)
+- PHP extensions: ZipArchive, GD (for manufacturer name images)
+
+Versionen bis 1.3.0 unterstützten PrestaShop 1.7/8. Ab Modul v2.0.0 wird nur noch PrestaShop 9.1.4+ unterstützt; ältere Shops lassen die Installation nicht mehr zu.
+
 ## Installation in PrestaShop
 
 1. In the PrestaShop back office, go to **Modules > Module Manager**.
