@@ -6,6 +6,10 @@
 config.xml
 config_*.xml
 
+# Local agent notes (credentials, admin URL)
+AGENTS.local.md
+CLAUDE.local.md
+
 # OS / Editor
 .DS_Store
 Thumbs.db

@@ -1,4 +1,5 @@
 @AGENTS.md
+@AGENTS.local.md
 
 ## Claude Code notes
 

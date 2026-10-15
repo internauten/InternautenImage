@@ -6,7 +6,15 @@
 [![GitHub stars](https://img.shields.io/github/stars/internauten/InternautenImage?style=social)](https://github.com/internauten/InternautenImage/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-This project contains an installable PrestaShop module that exports product images as a ZIP directly from the standard module configuration page.
+This project contains an installable PrestaShop module that exports and imports product images as a ZIP directly from the standard module configuration page.
+
+Features at a glance:
+
+- Product image export and import (ZIP)
+- Category image export and import (ZIP, including category thumbnails)
+- Copy category images to manufacturers with matching names
+- Generate name images for manufacturers without an image
+- Scope preview with counters for products and manufacturers without images
 
 ## Module Directory
 
@@ -14,7 +22,7 @@ This project contains an installable PrestaShop module that exports product imag
 
 ## Installable ZIP
 
-- find it under releses
+- find it under [Releases](https://github.com/internauten/InternautenImage/releases)
 
 ## Requirements
 
@@ -28,7 +36,16 @@ Versionen bis 1.3.0 unterstützten PrestaShop 1.7/8. Ab Modul v2.0.0 wird nur no
 1. In the PrestaShop back office, go to **Modules > Module Manager**.
 2. Click **Upload a module**.
 3. Upload `internautenimage-module-x.x.x.zip`.
-4. Install **Internauten Product Image Export**.
+4. Install **Internauten Product Image Export and Import**.
+
+## Scope Preview
+
+At the top of the configuration page the module shows:
+
+- **Products without images** for the selected shop scope and product filter
+- **Manufacturers without images** for the selected shop scope
+
+The panel **Scope preview** lets you change shop scope and product filter and refresh these counters without starting an export or import.
 
 ## Usage in Configuration Page
 
@@ -48,15 +65,27 @@ Versionen bis 1.3.0 unterstützten PrestaShop 1.7/8. Ab Modul v2.0.0 wird nur no
 The module provides a second button for import:
 
 1. Select shop scope and product filter.
-2. Upload a ZIP file.
-3. Click **Upload and import ZIP**.
+2. Select the import mode:
+   - **Replace existing images** (default): existing product images are deleted before the new ones are added.
+   - **Add new images additionally**: new images are appended after the existing ones.
+   - **Skip products with existing images**: only products without images get images.
+3. Upload a ZIP file.
+4. Click **Upload and import ZIP**.
+
+The upload runs in the background with a progress bar (upload and import). If the ZIP exceeds `upload_max_filesize` or `post_max_size`, the module shows the server limits instead of failing silently.
 
 Import Rules:
 
+- Accepted formats: `jpg`, `jpeg`, `png`, `gif`, `webp`; subfolders inside the ZIP are scanned too. Images are stored as JPG.
 - File name must match the product reference, e.g. `ABC123.jpg`.
 - Additional images: `ABC123_1.jpg`, `ABC123_2.jpg`, ...
 - Suffixes `_1`, `_2` are interpreted as 2nd, 3rd, ... image order.
+- If no product `ABC123` exists, a reference that itself ends in `_1` (e.g. `ABC123_1`) is matched as a whole.
+- If the product has no images yet, the first imported image becomes the cover image.
 - Image legend is set to the product name in all languages.
+- All product thumbnails are generated directly; the `actionWatermark` hook is triggered.
+
+After the import the module lists every skipped file with the reason (no matching reference, product outside the scope, product already has images in skip mode, invalid image).
 
 ## Category Image Export/Import
 
@@ -67,8 +96,10 @@ The module also supports category image export and import as ZIP:
 
 Category filename rules:
 
-- `cat_<categoryId>.jpg` (example: `cat_12.jpg`)
-- `cat_pre_<categoryId>.jpg` (example: `cat_pre_12.jpg`)
+- `cat_<categoryId>.jpg` (example: `cat_12.jpg`) → category image
+- `cat_pre_<categoryId>.jpg` (example: `cat_pre_12.jpg`) → category thumbnail (`<id>_thumb.jpg`)
+
+Only categories inside the selected shop scope are imported. All category image types are generated directly, and skipped files are listed with the reason.
 
 ## ZIP Naming Rules
 

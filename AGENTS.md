@@ -2,6 +2,18 @@
 
 PrestaShop **9.1.4+ only** back-office module `internautenimage`: ZIP export/import of product and category images, plus manufacturer image tools. User docs and feature notes: [README.md](README.md). Don't add compatibility code for PrestaShop 1.7/8.
 
+## Language
+
+- Chat answers and explanations: **German**.
+- Code, code comments, commit messages and AGENTS/skill files: **English**. Exception: feature notes in [README.md](README.md) are German.
+- German texts (translations, README) use proper umlauts (`ä`, `ö`, `ü`, `ß`), never ASCII substitutes.
+
+## Working principles
+
+- Keep changes small and purposeful; no sweeping reformatting of `internautenimage.php`.
+- When requirements are unclear, state assumptions before proceeding.
+- For changes that alter module behavior across several features, first present a short plan and wait for confirmation.
+
 ## Layout
 
 - [internautenimage/internautenimage.php](internautenimage/internautenimage.php) — the **entire module** in one class (`InternautenImage extends Module`). No hooks, no DB tables, no controllers, no Composer, no Smarty templates.
@@ -21,13 +33,22 @@ PrestaShop **9.1.4+ only** back-office module `internautenimage`: ZIP export/imp
 ## Conventions
 
 - PHP 8.1 is the minimum (PrestaShop 9 requirement): typed properties, arrow functions, `match`, enums and `readonly` properties are fine; no PHP 8.2+ features (readonly classes, DNF types, constants in traits). Short array syntax; explicit `(int)`/`(string)` casts on all `Tools::getValue()` input.
-- Escape any value placed in hand-built HTML with `htmlspecialchars(..., ENT_QUOTES, 'UTF-8')`; cast IDs with `(int)` / use `pSQL()` in SQL.
+- Escape any value placed in hand-built HTML with `htmlspecialchars(..., ENT_QUOTES, 'UTF-8')`; cast IDs with `(int)` / use `pSQL()` in SQL; always use `_DB_PREFIX_`, never a hardcoded `ps_`.
 - All UI strings go through `$this->l('English text')`. When adding/changing a string, add it to **both** translation files with key
   `<{internautenimage}prestashop>internautenimage_` + `md5('English text')`. Follow the [add-module-string skill](.github/skills/add-module-string/SKILL.md); its script lists missing keys.
-- New features: bump `$this->version` in `internautenimage.php` (semver) and add a short section to [README.md](README.md) (feature notes there are in German).
+- New features: bump `$this->version` in `internautenimage.php` (semver) and add a short section to [README.md](README.md) (feature notes there are in German). Keep the exact line format `$this->version = 'X.Y.Z';` — the release scripts parse it.
+
+## Local development environment
+
+- Docker Compose project: `../WoWGetPrestaLocal/docker-compose.yml`; run `docker compose` from `../WoWGetPrestaLocal`. Services: `db` (MariaDB), `php` (PHP-FPM), `nginx`.
+- `internautenimage/` is mounted into the shop at `modules/internautenimage` — changes are live without copying.
+- Front office: `http://localhost:8081`. Back office URL and DB credentials are in [AGENTS.local.md](AGENTS.local.md) (gitignored); read it when needed; never write credentials or the admin folder name into committed files.
+- PrestaShop core reference code: `../WoWGetPrestaLocal/html` — use it to check core APIs (`ImageManager`, `ImageType`, `HelperForm`, …) instead of guessing.
+- Clear cache after config/translation changes: `docker compose exec php sh -c 'rm -rf var/cache/prod var/cache/dev'`. Logs: `../WoWGetPrestaLocal/html/var/logs/`.
 
 ## Build / Release
 
 - No build, tests or linter. Syntax check: `php -l internautenimage/internautenimage.php` (also runs automatically after agent edits via [.github/hooks/php-lint.json](.github/hooks/php-lint.json)).
+- Since there are no automated tests, list concrete manual test steps (back-office path, dry run first) in the final answer.
 - Release = push tag `vX.Y.Z` matching `$this->version`; [.github/workflows/release.yml](.github/workflows/release.yml) zips `internautenimage/` and creates the GitHub release. Use [scripts/tag-release.sh](scripts/tag-release.sh) (requires clean working tree; `--local-only` to skip push). Pushing tags affects the shared repo — ask first.
 - Local PrestaShop dev setup: see [WoWGetPrestaLocal](https://github.com/internauten/WoWGetPrestaLocal).
