@@ -127,3 +127,6 @@ $_MODULE['<{internautenimage}prestashop>internautenimage_50acef338b8650fe6017404
 $_MODULE['<{internautenimage}prestashop>internautenimage_fe63ce6aaad405d8fd455abe36182469'] = 'Upload fehlgeschlagen: Das temporäre Verzeichnis fehlt auf dem Server.';
 $_MODULE['<{internautenimage}prestashop>internautenimage_bacc04403aba3ceb75eae68914cb34d7'] = 'Upload fehlgeschlagen: Der Server kann die hochgeladene Datei nicht schreiben.';
 $_MODULE['<{internautenimage}prestashop>internautenimage_af8a11cec054a0f23fbea905b51bf40f'] = 'Der Upload wurde durch eine PHP-Erweiterung blockiert.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_42ca6ced2ffe9c91afff65b66a9a6798'] = 'Bilder ab Datum';
+$_MODULE['<{internautenimage}prestashop>internautenimage_ac418cb9c361f56de226634cbcf9e4b6'] = 'Optional (JJJJ-MM-TT). Es werden nur Bilder exportiert, die an oder nach diesem Datum hochgeladen wurden (massgebend ist das Dateidatum). Leer lassen, um alle Bilder zu exportieren. Hinweis: Wird ein solches ZIP im Modus „Bestehende Bilder ersetzen" importiert, werden die älteren Bilder der betroffenen Produkte gelöscht.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_657412b03ec5c136ba81ec180ea97a02'] = 'Ungültiges Datum. Bitte das Format JJJJ-MM-TT verwenden.';

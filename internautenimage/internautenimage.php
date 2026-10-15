@@ -12,7 +12,7 @@ class InternautenImage extends Module
     {
         $this->name = 'internautenimage';
         $this->tab = 'administration';
-        $this->version = '2.0.0';
+        $this->version = '2.1.0';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -122,7 +122,8 @@ class InternautenImage extends Module
                 $langId = (int) Tools::getValue('INTERN_AUTENIMAGE_LANG_ID', (int) $this->context->language->id);
                 $shopScope = (string) Tools::getValue('INTERN_AUTENIMAGE_SHOP_SCOPE', 'current');
                 $productFilter = (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all');
-                $zipPath = $this->buildArchive($langId, $shopScope, $productFilter);
+                $minDate = trim((string) Tools::getValue('INTERN_AUTENIMAGE_EXPORT_MIN_DATE', ''));
+                $zipPath = $this->buildArchive($langId, $shopScope, $productFilter, $minDate);
                 $this->sendArchive($zipPath);
                 exit;
             } catch (Exception $e) {
@@ -370,6 +371,13 @@ class InternautenImage extends Module
                         ],
                         'desc' => $this->l('Choose whether to export all products or active products only.'),
                     ],
+                    [
+                        'type' => 'date',
+                        'label' => $this->l('Images from date'),
+                        'name' => 'INTERN_AUTENIMAGE_EXPORT_MIN_DATE',
+                        'required' => false,
+                        'desc' => $this->l('Optional (YYYY-MM-DD). Only images uploaded on or after this date are exported (based on the file date). Leave empty to export all images. Note: importing such a ZIP in replace mode deletes the older images of the affected products.'),
+                    ],
                 ],
                 'description' => $this->l('Click export to download the ZIP directly.'),
                 'submit' => [
@@ -392,6 +400,7 @@ class InternautenImage extends Module
             'INTERN_AUTENIMAGE_LANG_ID' => (int) Tools::getValue('INTERN_AUTENIMAGE_LANG_ID', (int) $this->context->language->id),
             'INTERN_AUTENIMAGE_SHOP_SCOPE' => (string) Tools::getValue('INTERN_AUTENIMAGE_SHOP_SCOPE', 'current'),
             'INTERN_AUTENIMAGE_PRODUCT_FILTER' => (string) Tools::getValue('INTERN_AUTENIMAGE_PRODUCT_FILTER', 'all'),
+            'INTERN_AUTENIMAGE_EXPORT_MIN_DATE' => (string) Tools::getValue('INTERN_AUTENIMAGE_EXPORT_MIN_DATE', ''),
         ];
 
         return $helper->generateForm([$fieldsForm]);
@@ -1071,9 +1080,18 @@ class InternautenImage extends Module
         return $helper->generateForm([$fieldsForm]);
     }
 
-    protected function buildArchive($langId, $shopScope, $productFilter)
+    protected function buildArchive($langId, $shopScope, $productFilter, $minDate = '')
     {
         @set_time_limit(0);
+
+        $minTimestamp = null;
+        if ($minDate !== '') {
+            $date = DateTime::createFromFormat('!Y-m-d', $minDate);
+            if ($date === false || $date->format('Y-m-d') !== $minDate) {
+                throw new Exception($this->l('Invalid date. Please use the format YYYY-MM-DD.'));
+            }
+            $minTimestamp = $date->getTimestamp();
+        }
 
         $langId = (int) $langId;
         if ($langId <= 0 || !Language::getLanguage($langId)) {
@@ -1115,9 +1133,13 @@ class InternautenImage extends Module
             $position = 0;
             foreach ($images as $img) {
                 $image = new Image((int) $img['id_image']);
-                $sourcePath = _PS_PROD_IMG_DIR_ . $image->getExistingImgPath() . '.jpg';
+                $sourcePath = _PS_PRODUCT_IMG_DIR_ . $image->getExistingImgPath() . '.jpg';
 
                 if (!is_file($sourcePath)) {
+                    continue;
+                }
+
+                if ($minTimestamp !== null && (int) @filemtime($sourcePath) < $minTimestamp) {
                     continue;
                 }
 

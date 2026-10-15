@@ -127,3 +127,6 @@ $_MODULE['<{internautenimage}prestashop>internautenimage_50acef338b8650fe6017404
 $_MODULE['<{internautenimage}prestashop>internautenimage_fe63ce6aaad405d8fd455abe36182469'] = 'Upload failed: temporary directory is missing on the server.';
 $_MODULE['<{internautenimage}prestashop>internautenimage_bacc04403aba3ceb75eae68914cb34d7'] = 'Upload failed: server cannot write the uploaded file.';
 $_MODULE['<{internautenimage}prestashop>internautenimage_af8a11cec054a0f23fbea905b51bf40f'] = 'Upload was blocked by a PHP extension.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_42ca6ced2ffe9c91afff65b66a9a6798'] = 'Images from date';
+$_MODULE['<{internautenimage}prestashop>internautenimage_ac418cb9c361f56de226634cbcf9e4b6'] = 'Optional (YYYY-MM-DD). Only images uploaded on or after this date are exported (based on the file date). Leave empty to export all images. Note: importing such a ZIP in replace mode deletes the older images of the affected products.';
+$_MODULE['<{internautenimage}prestashop>internautenimage_657412b03ec5c136ba81ec180ea97a02'] = 'Invalid date. Please use the format YYYY-MM-DD.';

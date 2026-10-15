@@ -182,6 +182,15 @@ Empfehlung: erst mit „Nur Vorschau = Ja" laufen lassen, Trefferliste prüfen, 
 
 Made changes.
 
+## Neue Funktion Export ab Datum
+
+Im Bereich „Bildexport (ZIP-Download)" gibt es das optionale Feld „Bilder ab Datum" (Modul v2.1.0).
+
+- `buildArchive()` exportiert bei gesetztem Datum nur Produktbilder, deren Originaldatei (`img/p/…/<id>.jpg`) ein Änderungsdatum (`filemtime`) an oder nach dem Datum (00:00 Uhr Serverzeit) hat. PrestaShop speichert kein Upload-Datum in der Tabelle `image`.
+- Die Nummerierung der Dateinamen (`REF`, `REF_1`, …) beginnt pro Produkt bei den gefilterten Bildern neu.
+- Achtung: Wurden Bilddateien kopiert oder neu generiert (z. B. Server-Umzug), kann das Dateidatum vom Upload-Datum abweichen.
+- Beim Re-Import eines gefilterten ZIPs den Modus „Neue Bilder zusätzlich hinzufügen" verwenden, sonst löscht „Bestehende Bilder ersetzen" die älteren Bilder.
+
 ## Weiteres/Zukünftiges
 
 Frage: muss nach dem bild upload die "Wiederherstellen der Vorschaubilder" ausgeführt werden?
